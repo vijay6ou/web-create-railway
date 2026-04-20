@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+*.pyo
+.env
+vj_trading.db
+*.db
+.DS_Store
+venv/
+env/
+.venv/
