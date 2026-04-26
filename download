@@ -1,10 +1,857 @@
-__pycache__/
-*.pyc
-*.pyo
-.env
-vj_trading.db
-*.db
-.DS_Store
-venv/
-env/
-.venv/
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VJ Trading Dashboard</title>
+<style>
+  :root {
+    --bg:#0a0e1a; --surface:#111827; --surface2:#1a2235; --border:#1e2d45;
+    --accent:#00d4ff; --accent2:#7c3aed; --green:#10b981; --red:#ef4444;
+    --yellow:#f59e0b; --text:#e2e8f0; --muted:#64748b;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh}
+
+  /* ── LOGIN SCREEN ── */
+  .login-wrap{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px}
+  .login-box{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:40px;width:100%;max-width:380px}
+  .login-box h1{font-size:22px;margin-bottom:8px}.login-box p{color:var(--muted);font-size:13px;margin-bottom:28px}
+  .login-err{color:var(--red);font-size:12px;margin-top:8px;min-height:16px}
+
+  /* ── HEADER ── */
+  .header{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+  .header-left{display:flex;align-items:center;gap:10px}
+  .logo{width:34px;height:34px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;color:#fff}
+  .header h1{font-size:17px;font-weight:700}.header h1 span{color:var(--accent)}
+  .header-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .badge{background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:3px 10px;font-size:12px;color:var(--muted)}
+  .badge b{color:var(--accent)}
+  .role-badge{background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:3px 10px;font-size:11px;color:var(--yellow)}
+
+  /* ── TABS ── */
+  .tab-bar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;display:flex;gap:4px;overflow-x:auto}
+  .tab{padding:11px 18px;font-size:13px;font-weight:500;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;white-space:nowrap;transition:all .2s}
+  .tab:hover{color:var(--text)}.tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+
+  /* ── CONTENT ── */
+  .content{padding:24px;max-width:1400px;margin:0 auto}
+  .panel{display:none}.panel.active{display:block}
+
+  /* ── CARDS ── */
+  .cards-row{display:grid;grid-template-columns:repeat(auto-fill,minmax(185px,1fr));gap:14px;margin-bottom:22px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px}
+  .card-label{font-size:11px;text-transform:uppercase;letter-spacing:.9px;color:var(--muted);margin-bottom:7px}
+  .card-value{font-size:22px;font-weight:700}.card-sub{font-size:11px;color:var(--muted);margin-top:3px}
+  .green{color:var(--green)}.red{color:var(--red)}.yellow{color:var(--yellow)}.accent{color:var(--accent)}
+
+  /* ── TABLE ── */
+  .table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:20px}
+  table{width:100%;border-collapse:collapse}
+  thead th{background:var(--surface2);padding:11px 14px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.7px;color:var(--muted)}
+  tbody tr{border-bottom:1px solid var(--border);transition:background .15s}
+  tbody tr:hover{background:var(--surface2)}
+  tbody tr:last-child{border-bottom:none}
+  tbody td{padding:12px 14px;font-size:13px}
+
+  /* ── SCORE BAR ── */
+  .score-row{display:flex;align-items:center;gap:10px;margin-bottom:9px}
+  .score-label{width:155px;font-size:13px;color:var(--muted);flex-shrink:0}
+  .score-bar-bg{flex:1;height:7px;background:var(--surface2);border-radius:4px;overflow:hidden}
+  .score-bar-fill{height:100%;border-radius:4px;transition:width .6s ease}
+  .score-num{width:36px;text-align:right;font-size:13px;font-weight:600}
+
+  /* ── SESSION SELECTOR ── */
+  .session-selector{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 20px;margin-bottom:20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  .session-selector label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.8px}
+  select{background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--text);padding:7px 11px;font-size:13px;cursor:pointer;outline:none}
+  select:focus{border-color:var(--accent)}
+
+  /* ── FORMS ── */
+  .form-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px}
+  .form-group{display:flex;flex-direction:column;gap:5px}
+  .form-group label{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:var(--muted)}
+  .form-group input,.form-group select,.form-group textarea{background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--text);padding:9px 11px;font-size:13px;outline:none;font-family:inherit}
+  .form-group input:focus,.form-group select:focus,.form-group textarea:focus{border-color:var(--accent)}
+  .btn{background:linear-gradient(135deg,var(--accent),#0099bb);color:#000;font-weight:700;font-size:13px;padding:9px 20px;border-radius:7px;border:none;cursor:pointer;transition:opacity .2s}
+  .btn:hover{opacity:.85}
+  .btn-sec{background:var(--surface2);color:var(--text);border:1px solid var(--border);font-weight:500}
+  .btn-sec:hover{border-color:var(--accent);color:var(--accent);opacity:1}
+  .btn-red{background:var(--red);color:#fff}
+
+  /* ── DETAIL ITEMS ── */
+  .list-item{padding:9px 13px;border-left:3px solid;border-radius:0 7px 7px 0;background:var(--surface2);margin-bottom:7px;font-size:13px;line-height:1.5}
+  .list-item.violation{border-color:var(--red)}.list-item.strength{border-color:var(--green)}
+
+  /* ── SECTION TITLE ── */
+  .section-title{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:14px;display:flex;align-items:center;gap:8px}
+  .section-title::after{content:'';flex:1;height:1px;background:var(--border)}
+
+  /* ── CHARTS ── */
+  .chart-wrap{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:22px;margin-bottom:20px}
+
+  /* ── MODAL ── */
+  .modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:200;align-items:center;justify-content:center}
+  .modal-overlay.open{display:flex}
+  .modal{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:28px;width:90%;max-width:640px;max-height:90vh;overflow-y:auto}
+  .modal h2{font-size:17px;margin-bottom:20px;color:var(--accent)}
+  .modal-actions{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap}
+
+  /* ── INFO BOX ── */
+  .info-box{background:var(--surface2);border:1px solid var(--border);border-left:4px solid var(--accent);border-radius:7px;padding:14px;margin-bottom:16px;font-size:13px;line-height:1.7;color:var(--muted)}
+  .info-box b{color:var(--text)}.info-box code{background:var(--bg);padding:2px 5px;border-radius:3px;font-family:monospace;color:var(--accent);font-size:12px}
+
+  /* ── UPLOAD ZONE ── */
+  .upload-zone{border:2px dashed var(--border);border-radius:10px;padding:32px;text-align:center;cursor:pointer;transition:border-color .2s;margin-bottom:16px}
+  .upload-zone:hover,.upload-zone.drag{border-color:var(--accent)}
+  .upload-zone p{color:var(--muted);font-size:13px;margin-top:8px}
+
+  /* ── AI COMMENTARY ── */
+  .commentary-box{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:18px;font-size:13px;line-height:1.8;color:var(--text);white-space:pre-wrap}
+
+  /* ── SPINNER ── */
+  .spinner{display:inline-block;width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;margin-right:6px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* ── NOTIFICATION ── */
+  #notify{position:fixed;bottom:22px;right:22px;background:var(--green);color:#000;padding:11px 18px;border-radius:9px;font-size:13px;font-weight:600;transform:translateY(80px);opacity:0;transition:all .3s;z-index:999}
+  #notify.show{transform:translateY(0);opacity:1}
+  #notify.error{background:var(--red);color:#fff}
+
+  /* ── LOADING OVERLAY ── */
+  #loading{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:500;flex-direction:column;gap:12px}
+  #loading.hidden{display:none}
+  .load-text{color:var(--muted);font-size:14px}
+
+  @media(max-width:600px){.content{padding:14px}.cards-row{grid-template-columns:1fr 1fr}.header h1{font-size:14px}}
+</style>
+</head>
+<body>
+
+<!-- ── LOADING SCREEN ── -->
+<div id="loading">
+  <div class="logo" style="width:48px;height:48px;font-size:18px">VJ</div>
+  <div class="load-text" id="load-msg">Connecting to server…</div>
+</div>
+
+<!-- ── LOGIN SCREEN ── -->
+<div class="login-wrap" id="login-screen" style="display:none">
+  <div class="login-box">
+    <h1>VJ Trading</h1>
+    <p>Sign in to access your trading performance dashboard.</p>
+    <div class="form-group" style="margin-bottom:12px">
+      <label>Username</label>
+      <input type="text" id="l-user" placeholder="vijay" autocomplete="username">
+    </div>
+    <div class="form-group" style="margin-bottom:16px">
+      <label>Password</label>
+      <input type="password" id="l-pass" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <button class="btn" style="width:100%" onclick="doLogin()">Sign In</button>
+    <div class="login-err" id="login-err"></div>
+  </div>
+</div>
+
+<!-- ── MAIN APP ── -->
+<div id="app" style="display:none">
+  <div class="header">
+    <div class="header-left">
+      <div class="logo">VJ</div>
+      <h1>VJ <span>Trading</span> Dashboard</h1>
+    </div>
+    <div class="header-right">
+      <div class="badge">Sessions: <b id="session-count">0</b></div>
+      <div class="badge">Capital: <b id="latest-capital">—</b></div>
+      <div class="role-badge" id="role-badge">admin</div>
+      <button class="btn" id="add-btn" onclick="openAddModal()">+ Add Session</button>
+      <button class="btn btn-sec" onclick="doLogout()">Logout</button>
+    </div>
+  </div>
+
+  <div class="tab-bar">
+    <div class="tab active" onclick="switchTab('overview',this)">Overview</div>
+    <div class="tab" onclick="switchTab('sessions',this)">All Sessions</div>
+    <div class="tab" onclick="switchTab('detail',this)">Session Detail</div>
+    <div class="tab" onclick="switchTab('scoring',this)">Scoring</div>
+    <div class="tab" onclick="switchTab('upload',this)">Upload CSV</div>
+  </div>
+
+  <div class="content">
+
+    <!-- OVERVIEW -->
+    <div id="panel-overview" class="panel active">
+      <div class="cards-row" id="overview-cards"></div>
+      <div class="chart-wrap"><div class="section-title">Cumulative Net P&L</div><canvas id="equity-chart" height="80"></canvas></div>
+      <div class="chart-wrap"><div class="section-title">Session Score Trend</div><canvas id="score-chart" height="80"></canvas></div>
+    </div>
+
+    <!-- ALL SESSIONS -->
+    <div id="panel-sessions" class="panel">
+      <div class="section-title">All Trading Sessions</div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Date</th><th>Index</th><th>VIX</th><th>Capital</th><th>Gross P&L</th><th>Net P&L</th><th>Net ROI</th><th>Charges</th><th>Score</th><th></th></tr></thead>
+        <tbody id="sessions-tbody"></tbody>
+      </table></div>
+    </div>
+
+    <!-- DETAIL -->
+    <div id="panel-detail" class="panel">
+      <div class="session-selector">
+        <label>Session</label>
+        <select id="detail-select" onchange="renderDetail()"></select>
+        <button class="btn btn-sec" id="ai-btn" onclick="generateAI()" style="margin-left:auto">✦ Generate AI Commentary</button>
+      </div>
+      <div id="detail-content"></div>
+      <div id="commentary-section" style="display:none">
+        <div class="section-title">AI Commentary</div>
+        <div class="commentary-box" id="commentary-text"></div>
+      </div>
+    </div>
+
+    <!-- SCORING -->
+    <div id="panel-scoring" class="panel">
+      <div class="session-selector">
+        <label>Session</label>
+        <select id="scoring-select" onchange="renderScoring()"></select>
+      </div>
+      <div id="scoring-content"></div>
+    </div>
+
+    <!-- UPLOAD CSV -->
+    <div id="panel-upload" class="panel">
+      <div class="section-title">Upload Order Book CSV</div>
+      <div class="info-box">
+        <b>How this works:</b> Select a session date, upload your STOXXO order book CSV.
+        The server parses it, computes VWAP per strike, all 5 regulatory charges, and updates the session automatically.
+        Works from any device — phone, office PC, anywhere with internet.
+      </div>
+      <div class="session-selector" style="margin-bottom:16px">
+        <label>Session to update</label>
+        <select id="upload-session-select"></select>
+      </div>
+      <div class="upload-zone" id="upload-zone" onclick="document.getElementById('csv-file').click()" ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')" ondrop="handleDrop(event)">
+        <div style="font-size:28px;opacity:.4">📂</div>
+        <p>Click to select CSV or drag &amp; drop here</p>
+        <p id="upload-filename" style="color:var(--accent);margin-top:4px"></p>
+      </div>
+      <input type="file" id="csv-file" accept=".csv" style="display:none" onchange="handleFileSelect(this)">
+      <div style="display:flex;gap:10px;margin-bottom:16px">
+        <div class="form-group" style="flex:1">
+          <label>Capital deployed (₹) for ROI calculation</label>
+          <input type="number" id="upload-capital" placeholder="e.g. 20000000">
+        </div>
+        <div style="display:flex;align-items:flex-end">
+          <button class="btn" id="upload-btn" onclick="uploadCSV()" disabled>Upload &amp; Parse</button>
+        </div>
+      </div>
+      <div id="upload-result" style="display:none"></div>
+    </div>
+
+  </div><!-- .content -->
+</div><!-- #app -->
+
+<!-- ADD SESSION MODAL -->
+<div class="modal-overlay" id="add-modal">
+  <div class="modal">
+    <h2>+ Add New Session</h2>
+    <div class="form-grid">
+      <div class="form-group"><label>Date</label><input type="date" id="f-date"></div>
+      <div class="form-group"><label>Index</label>
+        <select id="f-index"><option>Nifty</option><option>BankNifty</option><option>Sensex</option><option>FinNifty</option></select>
+      </div>
+      <div class="form-group"><label>India VIX</label><input type="number" id="f-vix" placeholder="18.5" step="0.01"></div>
+      <div class="form-group"><label>Capital (₹)</label><input type="number" id="f-capital" placeholder="20000000"></div>
+      <div class="form-group"><label>Gross P&L (₹)</label><input type="number" id="f-gross" placeholder="124423"></div>
+      <div class="form-group"><label>Total Charges (₹)</label><input type="number" id="f-charges" placeholder="4863"></div>
+      <div class="form-group"><label>CE P&L (₹)</label><input type="number" id="f-ce" placeholder="80423"></div>
+      <div class="form-group"><label>PE P&L (₹)</label><input type="number" id="f-pe" placeholder="44000"></div>
+      <div class="form-group"><label>Orders Executed</label><input type="number" id="f-executed" placeholder="151"></div>
+      <div class="form-group"><label>Orders Rejected</label><input type="number" id="f-rejected" placeholder="0"></div>
+      <div class="form-group"><label>Market Toughness (1-10)</label><input type="number" id="f-mt" placeholder="6.85" step="0.01"></div>
+      <div class="form-group"><label>Overall Score (0-100)</label><input type="number" id="f-score" placeholder="71"></div>
+    </div>
+    <div style="margin-top:14px"><div class="form-group">
+      <label>Violations (one per line)</label>
+      <textarea id="f-violations" rows="3" style="resize:vertical"></textarea>
+    </div></div>
+    <div style="margin-top:10px"><div class="form-group">
+      <label>Strengths (one per line)</label>
+      <textarea id="f-strengths" rows="3" style="resize:vertical"></textarea>
+    </div></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="saveSession()">Save to Server</button>
+      <button class="btn btn-sec" onclick="closeAddModal()">Cancel</button>
+    </div>
+    <div id="save-err" style="color:var(--red);font-size:12px;margin-top:8px"></div>
+  </div>
+</div>
+
+<div id="notify"></div>
+
+<script>
+// ══════════════════════════════════════
+//  CONFIG
+// ══════════════════════════════════════
+const API = '';  // Empty = same domain. Works automatically on Railway.
+const TOKEN_KEY = 'vj_token';
+const ROLE_KEY  = 'vj_role';
+
+let sessions  = [];
+let userRole  = '';
+let csvFile   = null;
+
+// ══════════════════════════════════════
+//  API HELPERS
+// ══════════════════════════════════════
+function getToken() { return localStorage.getItem(TOKEN_KEY); }
+
+async function apiFetch(path, opts = {}) {
+  const token = getToken();
+  const headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const res = await fetch(API + path, { ...opts, headers });
+  if (res.status === 401) { doLogout(); return null; }
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail || 'API error');
+  }
+  return res.json();
+}
+
+// ══════════════════════════════════════
+//  AUTH
+// ══════════════════════════════════════
+async function doLogin() {
+  const username = document.getElementById('l-user').value.trim();
+  const password = document.getElementById('l-pass').value;
+  const errEl    = document.getElementById('login-err');
+  errEl.textContent = '';
+
+  try {
+    const data = await apiFetch('/auth/token', {
+      method: 'POST',
+      body: JSON.stringify({ username, password })
+    });
+    if (!data) return;
+    localStorage.setItem(TOKEN_KEY, data.access_token);
+
+    // Get role
+    const me = await apiFetch('/auth/me');
+    localStorage.setItem(ROLE_KEY, me.role);
+    userRole = me.role;
+
+    await bootApp();
+  } catch(e) {
+    errEl.textContent = e.message || 'Login failed';
+  }
+}
+
+function doLogout() {
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(ROLE_KEY);
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('loading').classList.add('hidden');
+}
+
+// ══════════════════════════════════════
+//  BOOT
+// ══════════════════════════════════════
+async function bootApp() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('loading').classList.remove('hidden');
+  document.getElementById('load-msg').textContent = 'Loading sessions…';
+
+  try {
+    sessions = await apiFetch('/sessions');
+    if (!sessions) return;
+
+    userRole = localStorage.getItem(ROLE_KEY) || 'readonly';
+    document.getElementById('role-badge').textContent = userRole;
+    document.getElementById('add-btn').style.display = userRole === 'admin' ? '' : 'none';
+
+    populateSelects();
+    renderOverview();
+    document.getElementById('loading').classList.add('hidden');
+    document.getElementById('app').style.display = 'block';
+  } catch(e) {
+    document.getElementById('load-msg').textContent = 'Could not connect to server. Check Railway is running.';
+  }
+}
+
+// On page load — check existing token
+window.addEventListener('load', async () => {
+  const token = getToken();
+  if (token) {
+    await bootApp();
+    if (document.getElementById('app').style.display === 'none') {
+      // bootApp failed or logged out
+      document.getElementById('loading').classList.add('hidden');
+      document.getElementById('login-screen').style.display = 'flex';
+    }
+  } else {
+    document.getElementById('loading').classList.add('hidden');
+    document.getElementById('login-screen').style.display = 'flex';
+  }
+});
+
+// ══════════════════════════════════════
+//  HELPERS
+// ══════════════════════════════════════
+function fmtCr(v) {
+  if (v == null) return '—';
+  const cr = Math.abs(v) / 1e7;
+  const sign = v < 0 ? '-' : '';
+  if (cr >= 1) return sign + '₹' + cr.toFixed(2) + 'Cr';
+  return sign + '₹' + (Math.abs(v)/1e5).toFixed(2) + 'L';
+}
+function fmtPnl(v) {
+  if (v == null) return '<span style="color:var(--muted)">—</span>';
+  return `<span class="${v>=0?'green':'red'}">${fmtCr(v)}</span>`;
+}
+function fmtRoi(v) {
+  if (v == null) return '<span style="color:var(--muted)">—</span>';
+  return `<span class="${v>=0?'green':'red'}">${v>=0?'+':''}${v.toFixed(3)}%</span>`;
+}
+function scoreColor(s) {
+  return s >= 75 ? '#10b981' : s >= 55 ? '#f59e0b' : '#ef4444';
+}
+
+function notify(msg, isError=false) {
+  const el = document.getElementById('notify');
+  el.textContent = msg;
+  el.className = isError ? 'error show' : 'show';
+  setTimeout(() => el.className = '', 3000);
+}
+
+// ══════════════════════════════════════
+//  TABS
+// ══════════════════════════════════════
+function switchTab(name, el) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('panel-' + name).classList.add('active');
+  if (name === 'overview')  renderOverview();
+  if (name === 'sessions')  renderSessionsTable();
+  if (name === 'detail')    renderDetail();
+  if (name === 'scoring')   renderScoring();
+  if (name === 'upload')    renderUploadTab();
+}
+
+// ══════════════════════════════════════
+//  OVERVIEW
+// ══════════════════════════════════════
+function renderOverview() {
+  const valid = sessions.filter(s => s.net_pnl != null);
+  const totalNet = valid.reduce((a,b) => a + b.net_pnl, 0);
+  const wins = valid.filter(s => s.net_pnl > 0).length;
+  const avgScore = sessions.length ? sessions.reduce((a,b) => a + (b.scores?.overall||0), 0) / sessions.length : 0;
+  const bestS = valid.length ? valid.reduce((a,b) => a.net_pnl > b.net_pnl ? a : b) : null;
+  const latestCap = sessions.length ? sessions[sessions.length-1].capital : null;
+
+  document.getElementById('session-count').textContent = sessions.length;
+  document.getElementById('latest-capital').textContent = latestCap ? fmtCr(latestCap).replace('₹','') : '—';
+
+  document.getElementById('overview-cards').innerHTML = `
+    <div class="card"><div class="card-label">Total Net P&L</div><div class="card-value ${totalNet>=0?'green':'red'}">${fmtCr(totalNet)}</div><div class="card-sub">${valid.length} sessions with data</div></div>
+    <div class="card"><div class="card-label">Win Rate</div><div class="card-value accent">${valid.length?Math.round(wins/valid.length*100):'—'}%</div><div class="card-sub">${wins}W / ${valid.length-wins}L</div></div>
+    <div class="card"><div class="card-label">Avg Score</div><div class="card-value" style="color:${scoreColor(avgScore)}">${avgScore.toFixed(0)}/100</div><div class="card-sub">${sessions.length} sessions</div></div>
+    <div class="card"><div class="card-label">Best Session</div><div class="card-value green">${bestS?fmtCr(bestS.net_pnl):'—'}</div><div class="card-sub">${bestS?bestS.full:'—'}</div></div>
+    <div class="card"><div class="card-label">Total Charges</div><div class="card-value yellow">${fmtCr(valid.reduce((a,b)=>a+(b.charges||0),0))}</div><div class="card-sub">All sessions</div></div>
+    <div class="card"><div class="card-label">Sessions</div><div class="card-value accent">${sessions.length}</div><div class="card-sub">${sessions.filter(s=>s.index==='Nifty').length}N · ${sessions.filter(s=>s.index==='BankNifty').length}BN · ${sessions.filter(s=>s.index==='Sensex').length}Sx</div></div>
+  `;
+  drawEquityChart();
+  drawScoreChart();
+}
+
+function drawEquityChart() {
+  const canvas = document.getElementById('equity-chart');
+  const ctx = canvas.getContext('2d');
+  const valid = sessions.filter(s => s.net_pnl != null);
+  if (!valid.length) return;
+  canvas.width = canvas.parentElement.offsetWidth - 44;
+  canvas.height = 150;
+  const W = canvas.width, H = canvas.height;
+  const pad = {l:72,r:24,t:20,b:38};
+  let cum = 0;
+  const pts = valid.map(s => { cum += s.net_pnl; return {label:s.date, val:cum}; });
+  const vals = pts.map(p => p.val);
+  const minV = Math.min(0, ...vals), maxV = Math.max(...vals);
+  const range = maxV - minV || 1;
+  ctx.clearRect(0,0,W,H);
+  const toX = i => pad.l + (i/(pts.length-1||1)) * (W-pad.l-pad.r);
+  const toY = v => pad.t + (1-(v-minV)/range) * (H-pad.t-pad.b);
+  const zy = toY(0);
+  ctx.strokeStyle='#1e2d45';ctx.lineWidth=1;ctx.setLineDash([4,4]);
+  ctx.beginPath();ctx.moveTo(pad.l,zy);ctx.lineTo(W-pad.r,zy);ctx.stroke();
+  ctx.setLineDash([]);
+  const grad = ctx.createLinearGradient(0,pad.t,0,H-pad.b);
+  grad.addColorStop(0,'rgba(0,212,255,.28)');grad.addColorStop(1,'rgba(0,212,255,.02)');
+  ctx.beginPath();
+  pts.forEach((p,i) => i===0?ctx.moveTo(toX(i),toY(p.val)):ctx.lineTo(toX(i),toY(p.val)));
+  ctx.lineTo(toX(pts.length-1),H-pad.b);ctx.lineTo(pad.l,H-pad.b);
+  ctx.fillStyle=grad;ctx.fill();
+  ctx.beginPath();ctx.strokeStyle='#00d4ff';ctx.lineWidth=2.5;
+  pts.forEach((p,i) => i===0?ctx.moveTo(toX(i),toY(p.val)):ctx.lineTo(toX(i),toY(p.val)));
+  ctx.stroke();
+  pts.forEach((p,i) => {
+    ctx.beginPath();ctx.arc(toX(i),toY(p.val),4,0,Math.PI*2);
+    ctx.fillStyle=p.val>=0?'#10b981':'#ef4444';ctx.fill();
+    ctx.fillStyle='#64748b';ctx.font='11px Segoe UI';ctx.textAlign='center';
+    ctx.fillText(p.label,toX(i),H-pad.b+14);
+    if(i===pts.length-1){ctx.fillStyle=p.val>=0?'#10b981':'#ef4444';ctx.font='bold 11px Segoe UI';ctx.textAlign='left';ctx.fillText(fmtCr(p.val),toX(i)+6,toY(p.val)-5);}
+  });
+  ctx.fillStyle='#64748b';ctx.font='11px Segoe UI';ctx.textAlign='right';
+  [minV,(minV+maxV)/2,maxV].forEach(v=>{ctx.fillText(fmtCr(v),pad.l-6,toY(v)+4);});
+}
+
+function drawScoreChart() {
+  const canvas = document.getElementById('score-chart');
+  const ctx = canvas.getContext('2d');
+  canvas.width = canvas.parentElement.offsetWidth - 44;
+  canvas.height = 130;
+  const W = canvas.width, H = canvas.height;
+  const pad = {l:36,r:20,t:18,b:38};
+  ctx.clearRect(0,0,W,H);
+  const spacing = (W-pad.l-pad.r)/sessions.length;
+  const barW = Math.min(55, spacing - 10);
+  sessions.forEach((s,i) => {
+    const score = s.scores?.overall || 0;
+    const x = pad.l + i*spacing + spacing/2 - barW/2;
+    const barH = (score/100)*(H-pad.t-pad.b);
+    const y = H-pad.b-barH;
+    const color = scoreColor(score);
+    const gr = ctx.createLinearGradient(0,y,0,H-pad.b);
+    gr.addColorStop(0,color);gr.addColorStop(1,color+'44');
+    ctx.fillStyle=gr;ctx.beginPath();ctx.roundRect(x,y,barW,barH,4);ctx.fill();
+    ctx.fillStyle=color;ctx.font='bold 11px Segoe UI';ctx.textAlign='center';
+    ctx.fillText(score,x+barW/2,y-5);
+    ctx.fillStyle='#64748b';ctx.font='11px Segoe UI';
+    ctx.fillText(s.date,x+barW/2,H-pad.b+14);
+  });
+  [55,75].forEach(v => {
+    const y = H-pad.b-(v/100)*(H-pad.t-pad.b);
+    ctx.strokeStyle=v===75?'#10b981':'#f59e0b';ctx.lineWidth=1;ctx.setLineDash([4,4]);
+    ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(W-pad.r,y);ctx.stroke();
+    ctx.setLineDash([]);
+  });
+}
+
+// ══════════════════════════════════════
+//  SESSIONS TABLE
+// ══════════════════════════════════════
+function renderSessionsTable() {
+  document.getElementById('sessions-tbody').innerHTML = sessions.map(s => `
+    <tr>
+      <td><b>${s.full||s.date}</b></td>
+      <td><span style="color:var(--accent)">${s.index||s.index_name}</span></td>
+      <td>${s.vix!=null?s.vix.toFixed(2):'—'}</td>
+      <td>${fmtCr(s.capital)}</td>
+      <td>${fmtPnl(s.gross_pnl)}</td>
+      <td>${fmtPnl(s.net_pnl)}</td>
+      <td>${fmtRoi(s.net_roi)}</td>
+      <td>${s.charges!=null?'<span class="yellow">'+fmtCr(s.charges)+'</span>':'—'}</td>
+      <td><b style="color:${scoreColor(s.scores?.overall||0)}">${s.scores?.overall||'—'}</b>/100</td>
+      <td><button class="btn btn-sec" style="padding:3px 10px;font-size:12px" onclick="goDetail('${s.id}')">View</button></td>
+    </tr>`).join('');
+}
+
+function goDetail(id) {
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab')[2].classList.add('active');
+  document.getElementById('panel-detail').classList.add('active');
+  document.getElementById('detail-select').value = id;
+  renderDetail();
+}
+
+// ══════════════════════════════════════
+//  DETAIL
+// ══════════════════════════════════════
+function renderDetail() {
+  const id = document.getElementById('detail-select').value;
+  const s = sessions.find(x => x.id === id);
+  if (!s) return;
+  document.getElementById('commentary-section').style.display = 'none';
+  if (s.ai_commentary) {
+    document.getElementById('commentary-text').textContent = s.ai_commentary;
+    document.getElementById('commentary-section').style.display = 'block';
+  }
+  document.getElementById('detail-content').innerHTML = `
+    <div class="cards-row">
+      <div class="card"><div class="card-label">Gross P&L</div><div class="card-value ${(s.gross_pnl||0)>=0?'green':'red'}">${fmtCr(s.gross_pnl)}</div></div>
+      <div class="card"><div class="card-label">Net P&L</div><div class="card-value ${(s.net_pnl||0)>=0?'green':'red'}">${fmtCr(s.net_pnl)}</div></div>
+      <div class="card"><div class="card-label">Net ROI</div><div class="card-value ${(s.net_roi||0)>=0?'green':'red'}">${s.net_roi!=null?(s.net_roi>=0?'+':'')+s.net_roi.toFixed(3)+'%':'—'}</div></div>
+      <div class="card"><div class="card-label">Charges</div><div class="card-value yellow">${fmtCr(s.charges)}</div></div>
+      <div class="card"><div class="card-label">VIX</div><div class="card-value accent">${s.vix!=null?s.vix.toFixed(2):'—'}</div></div>
+      <div class="card"><div class="card-label">Capital</div><div class="card-value">${fmtCr(s.capital)}</div></div>
+      <div class="card"><div class="card-label">CE P&L</div><div class="card-value ${(s.ce_pnl||0)>=0?'green':'red'}">${fmtCr(s.ce_pnl)}</div></div>
+      <div class="card"><div class="card-label">PE P&L</div><div class="card-value ${(s.pe_pnl||0)>=0?'green':'red'}">${fmtCr(s.pe_pnl)}</div></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:20px">
+      <div><div class="section-title">Violations</div>${(s.violations||[]).map(v=>`<div class="list-item violation">${v}</div>`).join('')||'<div class="list-item violation" style="opacity:.5">None recorded</div>'}</div>
+      <div><div class="section-title">Strengths</div>${(s.strengths||[]).map(v=>`<div class="list-item strength">${v}</div>`).join('')||'<div class="list-item strength" style="opacity:.5">None recorded</div>'}</div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px">
+      <div class="card"><div class="card-label">Market Toughness</div><div class="card-value accent">${s.mt!=null?s.mt.toFixed(2):'—'}/10</div></div>
+      <div class="card"><div class="card-label">Executions</div><div class="card-value">${s.executed!=null?s.executed:'—'}</div><div class="card-sub">${s.rejected!=null?s.rejected+' rejected':''}</div></div>
+      <div class="card"><div class="card-label">Carry Out</div><div class="card-value ${(s.carry_out||0)>0?'yellow':'green'}">${s.carry_out!=null?s.carry_out+' legs':'—'}</div></div>
+    </div>
+    ${s.note?`<div class="info-box" style="margin-top:14px"><b>Note:</b> ${s.note}</div>`:''}
+  `;
+}
+
+// ══════════════════════════════════════
+//  AI COMMENTARY
+// ══════════════════════════════════════
+async function generateAI() {
+  if (userRole !== 'admin') { notify('Admin only', true); return; }
+  const id = document.getElementById('detail-select').value;
+  const btn = document.getElementById('ai-btn');
+  btn.innerHTML = '<span class="spinner"></span>Generating…';
+  btn.disabled = true;
+  try {
+    const data = await apiFetch(`/ai-commentary/${id}`, { method: 'POST' });
+    // Refresh sessions
+    sessions = await apiFetch('/sessions');
+    renderDetail();
+    notify('AI commentary generated!');
+  } catch(e) {
+    notify(e.message, true);
+  } finally {
+    btn.innerHTML = '✦ Generate AI Commentary';
+    btn.disabled = false;
+  }
+}
+
+// ══════════════════════════════════════
+//  SCORING
+// ══════════════════════════════════════
+function renderScoring() {
+  const id = document.getElementById('scoring-select').value;
+  const s = sessions.find(x => x.id === id);
+  if (!s || !s.scores) return;
+  const sc = s.scores;
+  const dims = [
+    {key:'discipline',  label:'Discipline',          w:25},
+    {key:'cap_eff',     label:'Capital Efficiency',  w:20},
+    {key:'trade_q',     label:'Trade Quality',       w:20},
+    {key:'mkt_align',   label:'Market Alignment',    w:15},
+    {key:'vol_handle',  label:'Volatility Handling', w:10},
+    {key:'peer_cmp',    label:'Peer Comparison',     w:10},
+  ];
+  document.getElementById('scoring-content').innerHTML = `
+    <div class="cards-row" style="grid-template-columns:repeat(3,1fr)">
+      <div class="card"><div class="card-label">Overall Score</div><div class="card-value" style="color:${scoreColor(sc.overall||0)}">${sc.overall||'—'}/100</div><div class="card-sub">${(sc.overall||0)>=75?'🟢 Good':(sc.overall||0)>=55?'🟡 Average':'🔴 Below Par'}</div></div>
+      <div class="card"><div class="card-label">Market Toughness</div><div class="card-value accent">${s.mt!=null?s.mt.toFixed(2):'—'}/10</div></div>
+      <div class="card"><div class="card-label">Session</div><div class="card-value">${s.date}</div><div class="card-sub">${s.index||s.index_name} Expiry</div></div>
+    </div>
+    <div class="chart-wrap">
+      <div class="section-title">Six-Dimension Breakdown</div>
+      <div style="padding:6px 0">
+        ${dims.map(d=>{const raw=sc[d.key]||0;const color=scoreColor(raw);return`
+        <div class="score-row">
+          <div class="score-label">${d.label}<span style="color:var(--muted);font-size:11px"> (${d.w}%)</span></div>
+          <div class="score-bar-bg"><div class="score-bar-fill" style="width:${raw}%;background:linear-gradient(90deg,${color},${color}88)"></div></div>
+          <div class="score-num" style="color:${color}">${raw}</div>
+        </div>`;}).join('')}
+      </div>
+    </div>
+  `;
+}
+
+// ══════════════════════════════════════
+//  UPLOAD CSV TAB
+// ══════════════════════════════════════
+function renderUploadTab() {
+  const sel = document.getElementById('upload-session-select');
+  sel.innerHTML = sessions.map(s => `<option value="${s.id}">${s.full||s.date} — ${s.index||s.index_name}</option>`).join('');
+  // Add "New session" option
+  const newOpt = document.createElement('option');
+  newOpt.value = 'new';
+  newOpt.textContent = '+ New session (date from filename)';
+  sel.insertBefore(newOpt, sel.firstChild);
+}
+
+function handleFileSelect(input) {
+  csvFile = input.files[0];
+  if (csvFile) {
+    document.getElementById('upload-filename').textContent = csvFile.name;
+    document.getElementById('upload-btn').disabled = false;
+  }
+}
+
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('upload-zone').classList.remove('drag');
+  const file = e.dataTransfer.files[0];
+  if (file && file.name.endsWith('.csv')) {
+    csvFile = file;
+    document.getElementById('upload-filename').textContent = file.name;
+    document.getElementById('upload-btn').disabled = false;
+  } else {
+    notify('Please drop a .csv file', true);
+  }
+}
+
+async function uploadCSV() {
+  if (!csvFile) return;
+  const sessionId = document.getElementById('upload-session-select').value;
+  if (!sessionId || sessionId === 'new') {
+    notify('Please select an existing session', true);
+    return;
+  }
+  const capital = parseFloat(document.getElementById('upload-capital').value);
+  if (capital > 0) {
+    // Update capital on session first
+    const s = sessions.find(x => x.id === sessionId);
+    if (s) {
+      s.capital = capital;
+      await apiFetch('/sessions', { method:'POST', body:JSON.stringify({
+        ...s, index_name: s.index||s.index_name, scores:{overall:s.scores?.overall||0,...s.scores}
+      })}).catch(()=>{});
+    }
+  }
+
+  const btn = document.getElementById('upload-btn');
+  btn.innerHTML = '<span class="spinner"></span>Parsing…';
+  btn.disabled = true;
+
+  const formData = new FormData();
+  formData.append('file', csvFile);
+
+  try {
+    const token = getToken();
+    const res = await fetch(`${API}/upload-csv/${sessionId}`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}` },
+      body: formData
+    });
+    if (!res.ok) { const e = await res.json(); throw new Error(e.detail); }
+    const data = await res.json();
+
+    // Refresh sessions
+    sessions = await apiFetch('/sessions');
+    populateSelects();
+
+    // Show result
+    const charges = data.charges_breakdown;
+    document.getElementById('upload-result').style.display = 'block';
+    document.getElementById('upload-result').innerHTML = `
+      <div class="info-box" style="border-color:var(--green)">
+        <b>✅ Parse successful — ${data.message}</b><br>
+        Gross P&L: ₹${data.gross_pnl.toLocaleString('en-IN')} &nbsp;|&nbsp;
+        Net P&L: ₹${data.net_pnl.toLocaleString('en-IN')} &nbsp;|&nbsp;
+        Charges: ₹${data.total_charges.toLocaleString('en-IN')}<br>
+        STT: ₹${charges.stt.toLocaleString('en-IN')} &nbsp;|&nbsp;
+        Exchange: ₹${charges.exchange.toLocaleString('en-IN')} &nbsp;|&nbsp;
+        SEBI: ₹${charges.sebi.toFixed(2)} &nbsp;|&nbsp;
+        Stamp: ₹${charges.stamp.toLocaleString('en-IN')} &nbsp;|&nbsp;
+        GST: ₹${charges.gst.toLocaleString('en-IN')}<br>
+        ${data.carry_positions.length ? `<b style="color:var(--yellow)">⚠ ${data.carry_positions.length} carry position(s): ${data.carry_positions.map(p=>p.symbol).join(', ')}</b>` : ''}
+        ${data.warnings.length ? `<br><span style="color:var(--red)">Warnings: ${data.warnings.join(' | ')}</span>` : ''}
+      </div>
+    `;
+    notify('CSV parsed and saved!');
+  } catch(e) {
+    notify(e.message, true);
+  } finally {
+    btn.textContent = 'Upload & Parse';
+    btn.disabled = false;
+  }
+}
+
+// ══════════════════════════════════════
+//  ADD SESSION MODAL
+// ══════════════════════════════════════
+function openAddModal() {
+  if (userRole !== 'admin') { notify('Admin only', true); return; }
+  const last = sessions[sessions.length-1];
+  const next = new Date(last?.id || new Date());
+  next.setDate(next.getDate() + 3);
+  document.getElementById('f-date').value = next.toISOString().split('T')[0];
+  document.getElementById('add-modal').classList.add('open');
+}
+function closeAddModal() { document.getElementById('add-modal').classList.remove('open'); }
+
+async function saveSession() {
+  const date = document.getElementById('f-date').value;
+  if (!date) { document.getElementById('save-err').textContent='Date required'; return; }
+  const d    = new Date(date);
+  const mos  = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const gross    = parseFloat(document.getElementById('f-gross').value) || 0;
+  const charges  = parseFloat(document.getElementById('f-charges').value) || 0;
+  const capital  = parseFloat(document.getElementById('f-capital').value) || 20000000;
+  const net      = gross - charges;
+  const violations = document.getElementById('f-violations').value.split('\n').filter(x=>x.trim());
+  const strengths  = document.getElementById('f-strengths').value.split('\n').filter(x=>x.trim());
+  const overallScore = parseInt(document.getElementById('f-score').value) || 0;
+
+  const body = {
+    id:         date,
+    date:       `${d.getDate().toString().padStart(2,'0')} ${mos[d.getMonth()]}`,
+    full:       `${d.getDate().toString().padStart(2,'0')}-${mos[d.getMonth()]}-${d.getFullYear()}`,
+    index_name: document.getElementById('f-index').value,
+    dte:        0,
+    vix:        parseFloat(document.getElementById('f-vix').value) || null,
+    capital:    capital,
+    gross_pnl:  gross || null,
+    net_pnl:    net,
+    net_roi:    capital ? +(net/capital*100).toFixed(4) : null,
+    gross_roi:  capital ? +(gross/capital*100).toFixed(4) : null,
+    ce_pnl:     parseFloat(document.getElementById('f-ce').value) || null,
+    pe_pnl:     parseFloat(document.getElementById('f-pe').value) || null,
+    charges:    charges || null,
+    executed:   parseInt(document.getElementById('f-executed').value) || null,
+    rejected:   parseInt(document.getElementById('f-rejected').value) || 0,
+    mt:         parseFloat(document.getElementById('f-mt').value) || null,
+    carry_out:  0,
+    peer_rois:  [],
+    scores:     {overall:overallScore,discipline:0,cap_eff:0,trade_q:0,mkt_align:0,vol_handle:0,peer_cmp:0},
+    violations, strengths
+  };
+
+  const saveBtn = document.querySelector('.modal-actions .btn');
+  saveBtn.innerHTML = '<span class="spinner"></span>Saving…';
+  saveBtn.disabled = true;
+
+  try {
+    await apiFetch('/sessions', { method:'POST', body:JSON.stringify(body) });
+    sessions = await apiFetch('/sessions');
+    populateSelects();
+    renderOverview();
+    closeAddModal();
+    notify('Session saved to server!');
+  } catch(e) {
+    document.getElementById('save-err').textContent = e.message;
+  } finally {
+    saveBtn.textContent = 'Save to Server';
+    saveBtn.disabled = false;
+  }
+}
+
+// ══════════════════════════════════════
+//  SELECTS
+// ══════════════════════════════════════
+function populateSelects() {
+  const opts = sessions.map(s => `<option value="${s.id}">${s.full||s.date} — ${s.index||s.index_name}</option>`).join('');
+  document.getElementById('detail-select').innerHTML = opts;
+  document.getElementById('scoring-select').innerHTML = opts;
+  if (sessions.length) {
+    const lastId = sessions[sessions.length-1].id;
+    document.getElementById('detail-select').value = lastId;
+    document.getElementById('scoring-select').value = lastId;
+  }
+}
+
+// Close modal outside click
+document.getElementById('add-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeAddModal();
+});
+
+window.addEventListener('resize', () => { drawEquityChart(); drawScoreChart(); });
+</script>
+</body>
+</html>
