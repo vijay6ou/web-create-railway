@@ -1,0 +1,1552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VJ Trading Terminal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#04070f; --bg2:#080d1a; --surface:#0d1424; --surface2:#111b2e;
+  --surface3:#162036; --border:#1a2840; --border2:#223352;
+  --accent:#00e5ff; --accent2:#7b61ff; --accent3:#ff6b6b;
+  --green:#00e676; --red:#ff5252; --yellow:#ffd740; --orange:#ff9100;
+  --text:#e8edf5; --muted:#4a6080; --muted2:#6a80a0;
+  --font-mono:'JetBrains Mono',monospace;
+  --font-ui:'Space Grotesk',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:var(--font-ui);min-height:100vh;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;background:
+  radial-gradient(ellipse 80% 50% at 20% 0%,rgba(0,229,255,.04) 0%,transparent 60%),
+  radial-gradient(ellipse 60% 40% at 80% 100%,rgba(123,97,255,.04) 0%,transparent 60%);
+  pointer-events:none;z-index:0}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:var(--bg2)}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+
+/* ── LOADING ── */
+#loading{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;
+  align-items:center;justify-content:center;z-index:999;transition:opacity .3s}
+#loading.hidden{opacity:0;pointer-events:none}
+.loader-ring{width:48px;height:48px;border:3px solid var(--border2);border-top-color:var(--accent);
+  border-radius:50%;animation:spin .9s linear infinite;margin-bottom:16px}
+@keyframes spin{to{transform:rotate(360deg)}}
+#load-msg{color:var(--muted2);font-size:13px;font-family:var(--font-mono)}
+
+/* ── LOGIN ── */
+#login-screen{display:none;position:fixed;inset:0;background:var(--bg);
+  align-items:center;justify-content:center;z-index:100;padding:24px}
+.login-card{background:var(--surface);border:1px solid var(--border2);border-radius:20px;
+  padding:44px;width:100%;max-width:400px;position:relative;overflow:hidden}
+.login-card::before{content:'';position:absolute;top:-60px;right:-60px;width:180px;height:180px;
+  background:radial-gradient(circle,rgba(0,229,255,.12),transparent 70%);pointer-events:none}
+.login-logo{display:flex;align-items:center;gap:12px;margin-bottom:8px}
+.logo-mark{width:42px;height:42px;background:linear-gradient(135deg,var(--accent),var(--accent2));
+  border-radius:10px;display:flex;align-items:center;justify-content:center;
+  font-family:var(--font-mono);font-weight:700;font-size:16px;color:#000;flex-shrink:0}
+.login-card h1{font-size:20px;font-weight:700;letter-spacing:-.3px}
+.login-card h1 span{color:var(--accent)}
+.login-card p{color:var(--muted2);font-size:13px;margin-bottom:32px;margin-top:4px}
+.field{display:flex;flex-direction:column;gap:6px;margin-bottom:16px}
+.field label{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--muted2);font-family:var(--font-mono)}
+.field input{background:var(--surface2);border:1px solid var(--border2);border-radius:10px;
+  color:var(--text);padding:12px 14px;font-size:14px;font-family:var(--font-ui);outline:none;
+  transition:border-color .2s}
+.field input:focus{border-color:var(--accent)}
+.login-err{color:var(--red);font-size:12px;min-height:18px;font-family:var(--font-mono)}
+
+/* ── MAIN APP ── */
+#app{display:none;position:relative;z-index:1}
+
+/* ── HEADER ── */
+.header{background:rgba(8,13,26,.85);backdrop-filter:blur(12px);
+  border-bottom:1px solid var(--border);padding:0 24px;
+  display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;z-index:50;height:56px}
+.h-left{display:flex;align-items:center;gap:14px}
+.h-logo{width:32px;height:32px;background:linear-gradient(135deg,var(--accent),var(--accent2));
+  border-radius:8px;display:flex;align-items:center;justify-content:center;
+  font-family:var(--font-mono);font-weight:800;font-size:12px;color:#000}
+.h-title{font-size:15px;font-weight:700;letter-spacing:-.2px}
+.h-title span{color:var(--accent)}
+.h-pill{background:var(--surface2);border:1px solid var(--border);border-radius:20px;
+  padding:3px 10px;font-size:11px;color:var(--muted2);font-family:var(--font-mono)}
+.h-pill b{color:var(--accent)}
+.h-right{display:flex;align-items:center;gap:8px}
+.role-dot{width:7px;height:7px;border-radius:50%;background:var(--yellow);
+  box-shadow:0 0 6px var(--yellow);flex-shrink:0}
+.role-dot.admin{background:var(--green);box-shadow:0 0 6px var(--green)}
+.h-user{font-size:12px;color:var(--muted2);font-family:var(--font-mono)}
+
+/* ── SIDENAV ── */
+.layout{display:flex;min-height:calc(100vh - 56px)}
+.sidenav{width:220px;flex-shrink:0;background:var(--bg2);border-right:1px solid var(--border);
+  padding:20px 0;position:sticky;top:56px;height:calc(100vh - 56px);overflow-y:auto}
+.nav-section{padding:0 12px;margin-bottom:6px}
+.nav-label{font-size:10px;letter-spacing:1.2px;text-transform:uppercase;
+  color:var(--muted);padding:0 10px;margin-bottom:6px;font-family:var(--font-mono)}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:9px;
+  cursor:pointer;color:var(--muted2);font-size:13px;font-weight:500;transition:all .15s;
+  margin-bottom:2px;user-select:none}
+.nav-item:hover{background:var(--surface);color:var(--text)}
+.nav-item.active{background:var(--surface2);color:var(--accent);border-left:3px solid var(--accent);
+  padding-left:9px}
+.nav-item .ni{width:18px;text-align:center;font-size:14px;flex-shrink:0}
+.nav-divider{height:1px;background:var(--border);margin:10px 12px}
+
+/* ── CONTENT ── */
+.main{flex:1;overflow:hidden;min-width:0}
+.page{display:none;padding:24px;animation:fadeIn .2s ease}
+.page.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+/* ── PAGE HEADER ── */
+.page-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px}
+.page-hdr h2{font-size:20px;font-weight:700;letter-spacing:-.3px}
+.page-hdr h2 span{color:var(--accent)}
+
+/* ── BUTTONS ── */
+.btn{display:inline-flex;align-items:center;gap:7px;padding:9px 18px;border-radius:9px;
+  font-size:13px;font-weight:600;cursor:pointer;border:none;transition:all .15s;
+  font-family:var(--font-ui);white-space:nowrap}
+.btn-primary{background:linear-gradient(135deg,var(--accent),#00b8d9);color:#000}
+.btn-primary:hover{opacity:.88;transform:translateY(-1px)}
+.btn-ghost{background:transparent;border:1px solid var(--border2);color:var(--muted2)}
+.btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
+.btn-danger{background:rgba(255,82,82,.15);border:1px solid rgba(255,82,82,.3);color:var(--red)}
+.btn-danger:hover{background:rgba(255,82,82,.25)}
+.btn-sm{padding:6px 12px;font-size:12px;border-radius:7px}
+.btn:disabled{opacity:.4;cursor:not-allowed;transform:none!important}
+
+/* ── STAT CARDS ── */
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:14px;margin-bottom:24px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;
+  padding:18px;position:relative;overflow:hidden;transition:border-color .2s}
+.stat-card:hover{border-color:var(--border2)}
+.stat-card::after{content:'';position:absolute;top:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,var(--accent-c,var(--accent)),transparent)}
+.stat-card.green-c{--accent-c:var(--green)}.stat-card.red-c{--accent-c:var(--red)}
+.stat-card.yellow-c{--accent-c:var(--yellow)}.stat-card.purple-c{--accent-c:var(--accent2)}
+.sc-label{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted2);
+  margin-bottom:8px;font-family:var(--font-mono)}
+.sc-value{font-size:22px;font-weight:700;font-family:var(--font-mono);line-height:1}
+.sc-sub{font-size:11px;color:var(--muted);margin-top:5px}
+.green{color:var(--green)}.red{color:var(--red)}.yellow{color:var(--yellow)}
+.accent{color:var(--accent)}.muted{color:var(--muted2)}
+
+/* ── CHARTS ── */
+.chart-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;
+  padding:20px;margin-bottom:20px}
+.chart-title{font-size:12px;letter-spacing:.8px;text-transform:uppercase;
+  color:var(--muted2);margin-bottom:16px;font-family:var(--font-mono);
+  display:flex;align-items:center;gap:8px}
+.chart-title::after{content:'';flex:1;height:1px;background:var(--border)}
+
+/* ── TABLE ── */
+.tbl-wrap{background:var(--surface);border:1px solid var(--border);border-radius:14px;
+  overflow:hidden;margin-bottom:20px}
+.tbl-wrap table{width:100%;border-collapse:collapse}
+.tbl-wrap thead th{background:var(--surface2);padding:11px 14px;text-align:left;
+  font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);
+  font-family:var(--font-mono);white-space:nowrap}
+.tbl-wrap tbody tr{border-bottom:1px solid var(--border);transition:background .12s;cursor:pointer}
+.tbl-wrap tbody tr:hover{background:var(--surface2)}
+.tbl-wrap tbody tr:last-child{border-bottom:none}
+.tbl-wrap tbody td{padding:11px 14px;font-size:13px;font-family:var(--font-mono)}
+
+/* ── BADGE ── */
+.badge{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;
+  font-size:11px;font-weight:600;font-family:var(--font-mono)}
+.badge-green{background:rgba(0,230,118,.12);color:var(--green);border:1px solid rgba(0,230,118,.2)}
+.badge-red{background:rgba(255,82,82,.12);color:var(--red);border:1px solid rgba(255,82,82,.2)}
+.badge-yellow{background:rgba(255,215,64,.12);color:var(--yellow);border:1px solid rgba(255,215,64,.2)}
+.badge-blue{background:rgba(0,229,255,.1);color:var(--accent);border:1px solid rgba(0,229,255,.2)}
+.badge-purple{background:rgba(123,97,255,.12);color:var(--accent2);border:1px solid rgba(123,97,255,.2)}
+
+/* ── SESSION SELECTOR ── */
+.sess-sel{background:var(--surface);border:1px solid var(--border);border-radius:12px;
+  padding:14px 18px;margin-bottom:20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.sess-sel label{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);
+  font-family:var(--font-mono);flex-shrink:0}
+select{background:var(--surface2);border:1px solid var(--border2);border-radius:8px;
+  color:var(--text);padding:8px 12px;font-size:13px;cursor:pointer;outline:none;
+  font-family:var(--font-mono);transition:border-color .2s}
+select:focus{border-color:var(--accent)}
+
+/* ── SCORE BAR ── */
+.score-rows{display:flex;flex-direction:column;gap:10px}
+.score-row{display:flex;align-items:center;gap:12px}
+.score-lbl{width:170px;font-size:12px;color:var(--muted2);flex-shrink:0;font-family:var(--font-mono)}
+.score-bar-bg{flex:1;height:6px;background:var(--surface2);border-radius:4px;overflow:hidden}
+.score-bar-fill{height:100%;border-radius:4px;transition:width .7s cubic-bezier(.4,0,.2,1)}
+.score-num{width:36px;text-align:right;font-size:12px;font-weight:700;font-family:var(--font-mono)}
+
+/* ── FORM ── */
+.form-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px}
+.f-group{display:flex;flex-direction:column;gap:6px}
+.f-group label{font-size:10px;letter-spacing:1px;text-transform:uppercase;
+  color:var(--muted2);font-family:var(--font-mono)}
+.f-group input,.f-group select,.f-group textarea{
+  background:var(--surface2);border:1px solid var(--border2);border-radius:9px;
+  color:var(--text);padding:10px 12px;font-size:13px;outline:none;
+  font-family:var(--font-mono);transition:border-color .2s}
+.f-group input:focus,.f-group select:focus,.f-group textarea:focus{border-color:var(--accent)}
+.f-group textarea{resize:vertical;min-height:80px}
+.f-full{grid-column:1/-1}
+
+/* ── MODAL ── */
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);
+  z-index:200;align-items:flex-start;justify-content:center;padding:40px 16px;overflow-y:auto}
+.overlay.open{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border2);border-radius:18px;
+  padding:28px;width:100%;max-width:700px;position:relative}
+.modal-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px}
+.modal-hdr h3{font-size:17px;font-weight:700}
+.modal-close{background:var(--surface2);border:1px solid var(--border);border-radius:7px;
+  color:var(--muted2);padding:6px 10px;cursor:pointer;font-size:16px;line-height:1;
+  transition:all .15s}
+.modal-close:hover{color:var(--text);border-color:var(--border2)}
+.modal-actions{display:flex;gap:10px;margin-top:22px;flex-wrap:wrap}
+.modal-err{color:var(--red);font-size:12px;font-family:var(--font-mono);min-height:16px;margin-top:8px}
+
+/* ── LISTS ── */
+.list-item{padding:10px 14px;border-left:3px solid;border-radius:0 9px 9px 0;
+  background:var(--surface2);margin-bottom:8px;font-size:13px;line-height:1.5;
+  transition:background .15s}
+.list-item.viol{border-color:var(--red);background:rgba(255,82,82,.05)}
+.list-item.str{border-color:var(--green);background:rgba(0,230,118,.04)}
+
+/* ── UPLOAD ZONE ── */
+.drop-zone{border:2px dashed var(--border2);border-radius:12px;padding:28px;
+  text-align:center;cursor:pointer;transition:all .2s;position:relative}
+.drop-zone:hover,.drop-zone.drag{border-color:var(--accent);background:rgba(0,229,255,.03)}
+.drop-zone .dz-icon{font-size:28px;margin-bottom:8px;display:block}
+.drop-zone p{color:var(--muted);font-size:13px}
+.drop-zone .dz-name{color:var(--accent);font-family:var(--font-mono);font-size:12px;margin-top:6px}
+
+/* ── INFO BOX ── */
+.info-box{background:var(--surface2);border:1px solid var(--border);border-radius:10px;
+  padding:14px;font-size:13px;line-height:1.7;margin-bottom:14px}
+.info-box.success{border-color:rgba(0,230,118,.3);background:rgba(0,230,118,.05)}
+.info-box.warn{border-color:rgba(255,215,64,.3);background:rgba(255,215,64,.05)}
+.info-box.err{border-color:rgba(255,82,82,.3);background:rgba(255,82,82,.05)}
+
+/* ── TABS (sub) ── */
+.sub-tabs{display:flex;gap:4px;margin-bottom:20px;background:var(--surface);
+  border:1px solid var(--border);border-radius:10px;padding:5px}
+.sub-tab{padding:7px 16px;border-radius:7px;cursor:pointer;font-size:13px;font-weight:500;
+  color:var(--muted2);transition:all .15s;white-space:nowrap}
+.sub-tab:hover{color:var(--text)}
+.sub-tab.active{background:var(--surface2);color:var(--accent)}
+
+/* ── CHART IMAGE DISPLAY ── */
+.chart-img-wrap{border-radius:12px;overflow:hidden;border:1px solid var(--border);
+  background:var(--surface2);position:relative}
+.chart-img-wrap img{width:100%;display:block;max-height:500px;object-fit:contain}
+.chart-img-toolbar{position:absolute;top:10px;right:10px;display:flex;gap:6px}
+
+/* ── JOURNAL ── */
+.journal-view{background:var(--surface2);border:1px solid var(--border);border-radius:12px;
+  padding:18px;font-size:14px;line-height:1.8;white-space:pre-wrap;
+  font-family:var(--font-mono);color:var(--text);min-height:80px}
+
+/* ── NOTIFY ── */
+#notify{position:fixed;bottom:24px;right:24px;z-index:999;
+  background:var(--surface);border:1px solid var(--border2);border-radius:12px;
+  padding:12px 18px;font-size:13px;font-family:var(--font-mono);
+  transform:translateY(80px);opacity:0;transition:all .3s;max-width:360px}
+#notify.show{transform:none;opacity:1}
+#notify.err{border-color:rgba(255,82,82,.4);color:var(--red)}
+#notify.ok{border-color:rgba(0,230,118,.4);color:var(--green)}
+
+/* ── SPINNER ── */
+.spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(0,0,0,.3);
+  border-top-color:rgba(0,0,0,.8);border-radius:50%;animation:spin .7s linear infinite}
+.spinner.light{border:2px solid rgba(255,255,255,.2);border-top-color:var(--accent)}
+
+/* ── SECTION TITLE ── */
+.sec-title{font-size:10px;letter-spacing:1.2px;text-transform:uppercase;
+  color:var(--muted);margin-bottom:14px;font-family:var(--font-mono);
+  display:flex;align-items:center;gap:8px}
+.sec-title::after{content:'';flex:1;height:1px;background:var(--border)}
+
+/* ── GRID 2 ── */
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+@media(max-width:800px){.g2,.g3{grid-template-columns:1fr}.sidenav{display:none}}
+
+/* ── TWO PANEL LAYOUT ── */
+.detail-layout{display:grid;grid-template-columns:1fr 380px;gap:20px;align-items:start}
+@media(max-width:1100px){.detail-layout{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div id="loading">
+  <div class="loader-ring"></div>
+  <div id="load-msg">Connecting to terminal…</div>
+</div>
+
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="logo-mark">VJ</div>
+      <div>
+        <div class="login-card h1" style="font-size:18px;font-weight:700">VJ <span style="color:var(--accent)">Trading</span></div>
+      </div>
+    </div>
+    <p style="color:var(--muted2);font-size:13px;margin-bottom:28px">Options Analytics Terminal · v2.0</p>
+    <div class="field"><label>Username</label><input id="l-user" type="text" placeholder="vijay" autocomplete="username"></div>
+    <div class="field"><label>Password</label><input id="l-pass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
+    <div class="login-err" id="login-err"></div>
+    <button class="btn btn-primary" style="width:100%;margin-top:20px;justify-content:center" onclick="doLogin()">Sign In</button>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <header class="header">
+    <div class="h-left">
+      <div class="h-logo">VJ</div>
+      <span class="h-title">VJ <span>Trading</span></span>
+      <span class="h-pill">Sessions: <b id="hdr-count">0</b></span>
+      <span class="h-pill">Capital: <b id="hdr-capital">—</b></span>
+    </div>
+    <div class="h-right">
+      <div class="role-dot" id="role-dot"></div>
+      <span class="h-user" id="h-user"></span>
+      <button class="btn btn-ghost btn-sm" onclick="doLogout()">Logout</button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <!-- SIDENAV -->
+    <nav class="sidenav">
+      <div class="nav-section">
+        <div class="nav-label">Analytics</div>
+        <div class="nav-item active" onclick="nav('overview',this)"><span class="ni">◈</span>Overview</div>
+        <div class="nav-item" onclick="nav('sessions',this)"><span class="ni">≡</span>All Sessions</div>
+        <div class="nav-item" onclick="nav('detail',this)"><span class="ni">◉</span>Session Detail</div>
+        <div class="nav-item" onclick="nav('scoring',this)"><span class="ni">⬡</span>Scoring</div>
+      </div>
+      <div class="nav-divider"></div>
+      <div class="nav-section">
+        <div class="nav-label">Data Entry</div>
+        <div class="nav-item" id="nav-add" onclick="openAddModal()"><span class="ni">＋</span>New Session</div>
+        <div class="nav-item" onclick="nav('upload',this)"><span class="ni">↑</span>Upload CSV</div>
+        <div class="nav-item" onclick="nav('charts',this)"><span class="ni">▦</span>Charts &amp; Journal</div>
+      </div>
+      <div class="nav-divider"></div>
+      <div class="nav-section">
+        <div class="nav-label">System</div>
+        <div class="nav-item" onclick="nav('settings',this)"><span class="ni">⚙</span>Settings</div>
+      </div>
+    </nav>
+
+    <!-- MAIN CONTENT -->
+    <main class="main">
+
+      <!-- ═══ OVERVIEW ═══ -->
+      <div id="page-overview" class="page active">
+        <div class="page-hdr">
+          <h2>Portfolio <span>Overview</span></h2>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-ghost btn-sm" onclick="loadSessions();notify('Refreshed','ok')">↻ Refresh</button>
+          </div>
+        </div>
+        <div class="stat-grid" id="ov-cards"></div>
+        <div class="g2">
+          <div class="chart-card">
+            <div class="chart-title">Cumulative Net P&amp;L</div>
+            <canvas id="equity-chart"></canvas>
+          </div>
+          <div class="chart-card">
+            <div class="chart-title">Session Score Tracker</div>
+            <canvas id="score-chart"></canvas>
+          </div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">CE vs PE P&amp;L by Session</div>
+          <canvas id="cepe-chart"></canvas>
+        </div>
+      </div>
+
+      <!-- ═══ ALL SESSIONS ═══ -->
+      <div id="page-sessions" class="page">
+        <div class="page-hdr">
+          <h2>All <span>Sessions</span></h2>
+          <div style="display:flex;gap:8px">
+            <input id="sess-search" type="text" placeholder="Search…"
+              style="background:var(--surface);border:1px solid var(--border);border-radius:8px;
+              color:var(--text);padding:8px 12px;font-size:13px;outline:none;width:180px"
+              oninput="renderSessionsTable()">
+          </div>
+        </div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr>
+              <th>Date</th><th>Index</th><th>VIX</th><th>Capital</th>
+              <th>Gross P&amp;L</th><th>Net P&amp;L</th><th>ROI</th>
+              <th>Charges</th><th>Score</th><th>Actions</th>
+            </tr></thead>
+            <tbody id="sess-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ═══ SESSION DETAIL ═══ -->
+      <div id="page-detail" class="page">
+        <div class="page-hdr">
+          <h2>Session <span>Detail</span></h2>
+          <div style="display:flex;align-items:center;gap:8px">
+            <select id="detail-sel" onchange="renderDetail()" style="min-width:200px"></select>
+            <button class="btn btn-ghost btn-sm" id="edit-btn" onclick="openEditModal()">✎ Edit</button>
+            <button class="btn btn-ghost btn-sm" id="ai-btn" onclick="generateAI()">✦ AI Commentary</button>
+          </div>
+        </div>
+        <div class="sub-tabs">
+          <div class="sub-tab active" onclick="subTab('dt-summary',this)">Summary</div>
+          <div class="sub-tab" onclick="subTab('dt-strikes',this)">Strikes</div>
+          <div class="sub-tab" onclick="subTab('dt-chart',this)">Chart</div>
+          <div class="sub-tab" onclick="subTab('dt-journal',this)">Journal</div>
+          <div class="sub-tab" onclick="subTab('dt-ai',this)">AI Commentary</div>
+        </div>
+        <div id="dt-summary"></div>
+        <div id="dt-strikes" style="display:none"></div>
+        <div id="dt-chart" style="display:none"></div>
+        <div id="dt-journal" style="display:none"></div>
+        <div id="dt-ai" style="display:none"></div>
+      </div>
+
+      <!-- ═══ SCORING ═══ -->
+      <div id="page-scoring" class="page">
+        <div class="page-hdr">
+          <h2>Performance <span>Scoring</span></h2>
+          <select id="scoring-sel" onchange="renderScoring()" style="min-width:200px"></select>
+        </div>
+        <div id="scoring-content"></div>
+      </div>
+
+      <!-- ═══ UPLOAD CSV ═══ -->
+      <div id="page-upload" class="page">
+        <div class="page-hdr"><h2>Upload <span>Order Book CSV</span></h2></div>
+        <div class="info-box warn">
+          <b>Supported formats:</b> STOXXO, Jainam XTS, Zerodha, and most Indian broker CSVs.
+          The parser auto-detects columns for Symbol, Side (BUY/SELL), Qty, Price, and Status.
+          If parsing fails, the error message will show detected column names to help debug.
+        </div>
+        <div class="g2" style="align-items:start">
+          <div>
+            <div class="sec-title">Select Session</div>
+            <div class="sess-sel" style="margin-bottom:14px">
+              <label>Session</label>
+              <select id="up-sess" style="flex:1"></select>
+            </div>
+            <div class="f-group" style="margin-bottom:14px">
+              <label>Capital (₹) — optional override</label>
+              <input type="number" id="up-capital" placeholder="e.g. 20000000">
+            </div>
+            <div class="drop-zone" id="up-zone"
+              onclick="document.getElementById('csv-inp').click()"
+              ondragover="event.preventDefault();this.classList.add('drag')"
+              ondragleave="this.classList.remove('drag')"
+              ondrop="handleDrop(event)">
+              <span class="dz-icon">📂</span>
+              <p>Click to select or drag &amp; drop your CSV file</p>
+              <div class="dz-name" id="up-fname"></div>
+            </div>
+            <input type="file" id="csv-inp" accept=".csv,.txt" style="display:none" onchange="handleFileSelect(this)">
+            <div style="margin-top:14px">
+              <button class="btn btn-primary" id="up-btn" onclick="uploadCSV()" disabled>↑ Parse &amp; Upload</button>
+            </div>
+          </div>
+          <div>
+            <div id="up-result"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ CHARTS & JOURNAL ═══ -->
+      <div id="page-charts" class="page">
+        <div class="page-hdr">
+          <h2>Charts &amp; <span>Journal</span></h2>
+          <select id="cj-sess" onchange="renderChartsPage()" style="min-width:200px"></select>
+        </div>
+        <div class="g2" style="align-items:start">
+          <div>
+            <div class="sec-title">Day Chart</div>
+            <div id="cj-chart-area"></div>
+            <div class="drop-zone" id="cj-drop"
+              onclick="document.getElementById('chart-inp').click()"
+              ondragover="event.preventDefault();this.classList.add('drag')"
+              ondragleave="this.classList.remove('drag')"
+              ondrop="handleChartDrop(event)">
+              <span class="dz-icon">🖼</span>
+              <p>Click or drag to upload chart image (JPG/PNG, max 10MB)</p>
+              <div class="dz-name" id="cj-fname"></div>
+            </div>
+            <input type="file" id="chart-inp" accept="image/*" style="display:none" onchange="handleChartSelect(this)">
+            <div style="margin-top:12px;display:flex;gap:8px">
+              <button class="btn btn-primary btn-sm" id="cj-upload-btn" onclick="uploadChart()" disabled>Upload Chart</button>
+              <button class="btn btn-danger btn-sm" id="cj-del-btn" onclick="deleteChart()" style="display:none">Delete Chart</button>
+            </div>
+          </div>
+          <div>
+            <div class="sec-title">Trade Journal</div>
+            <div id="cj-journal-area"></div>
+            <div class="f-group" style="margin-bottom:12px">
+              <label>Edit Journal</label>
+              <textarea id="cj-journal-edit" rows="10" placeholder="Pre-market plan, trade rationale, post-session notes…"></textarea>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="saveJournal()">Save Journal</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ SETTINGS ═══ -->
+      <div id="page-settings" class="page">
+        <div class="page-hdr"><h2>Settings &amp; <span>Info</span></h2></div>
+        <div class="info-box">
+          <b>VJ Trading Terminal v2.0</b><br>
+          Deployed on Railway · FastAPI backend · SQLite / PostgreSQL storage<br>
+          AI commentary powered by Claude Haiku
+        </div>
+        <div class="info-box">
+          <b>Charge Engine Rates (Post-Budget 2024)</b><br>
+          STT: 0.1% on sell value · Exchange: 0.053% on turnover<br>
+          SEBI: ₹10/Cr · Stamp: 0.003% on buy value · GST: 18% on (exchange+SEBI)
+        </div>
+        <div class="info-box warn" id="vpn-note">
+          <b>⚠ VPN / Cloudflare Access:</b> If the app requires VPN or Cloudflare Tunnel to access,
+          consider adding a public Railway domain or reviewing your Railway service networking settings.
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<!-- ═══ ADD / EDIT SESSION MODAL ═══ -->
+<div class="overlay" id="sess-modal">
+  <div class="modal">
+    <div class="modal-hdr">
+      <h3 id="modal-title">New Session</h3>
+      <button class="modal-close" onclick="closeSessModal()">✕</button>
+    </div>
+    <div class="form-grid">
+      <div class="f-group"><label>Date</label><input type="date" id="f-date"></div>
+      <div class="f-group"><label>Index</label>
+        <select id="f-index"><option>Nifty</option><option>BankNifty</option><option>Sensex</option><option>FinNifty</option><option>MidcpNifty</option></select>
+      </div>
+      <div class="f-group"><label>India VIX</label><input type="number" id="f-vix" placeholder="18.50" step="0.01"></div>
+      <div class="f-group"><label>Capital (₹)</label><input type="number" id="f-capital" placeholder="20000000"></div>
+      <div class="f-group"><label>Gross P&amp;L (₹)</label><input type="number" id="f-gross" placeholder="124423"></div>
+      <div class="f-group"><label>Total Charges (₹)</label><input type="number" id="f-charges" placeholder="4863"></div>
+      <div class="f-group"><label>CE P&amp;L (₹)</label><input type="number" id="f-ce" placeholder="80423"></div>
+      <div class="f-group"><label>PE P&amp;L (₹)</label><input type="number" id="f-pe" placeholder="44000"></div>
+      <div class="f-group"><label>Executed Orders</label><input type="number" id="f-executed" placeholder="151"></div>
+      <div class="f-group"><label>Rejected Orders</label><input type="number" id="f-rejected" placeholder="0"></div>
+      <div class="f-group"><label>Market Toughness (1–10)</label><input type="number" id="f-mt" placeholder="6.85" step="0.01"></div>
+      <div class="f-group"><label>Overall Score (0–100)</label><input type="number" id="f-score" placeholder="71"></div>
+      <div class="f-group"><label>Discipline (0–100)</label><input type="number" id="f-disc" placeholder="70"></div>
+      <div class="f-group"><label>Capital Efficiency (0–100)</label><input type="number" id="f-capeff" placeholder="80"></div>
+      <div class="f-group"><label>Trade Quality (0–100)</label><input type="number" id="f-trq" placeholder="65"></div>
+      <div class="f-group"><label>Market Alignment (0–100)</label><input type="number" id="f-mka" placeholder="55"></div>
+      <div class="f-group"><label>Volatility Handling (0–100)</label><input type="number" id="f-volh" placeholder="68"></div>
+      <div class="f-group"><label>Peer Comparison (0–100)</label><input type="number" id="f-peer" placeholder="92"></div>
+      <div class="f-group"><label>Carry Legs Out</label><input type="number" id="f-carry" placeholder="0" value="0"></div>
+      <div class="f-group"><label>Short Note</label><input type="text" id="f-note" placeholder="Brief summary…"></div>
+    </div>
+    <div style="margin-top:14px" class="f-group">
+      <label>Violations (one per line)</label>
+      <textarea id="f-violations" rows="3"></textarea>
+    </div>
+    <div style="margin-top:10px" class="f-group">
+      <label>Strengths (one per line)</label>
+      <textarea id="f-strengths" rows="3"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" onclick="saveSession()">💾 Save Session</button>
+      <button class="btn btn-ghost" onclick="closeSessModal()">Cancel</button>
+      <button class="btn btn-danger" id="del-btn" style="margin-left:auto;display:none" onclick="deleteSession()">🗑 Delete</button>
+    </div>
+    <div class="modal-err" id="modal-err"></div>
+  </div>
+</div>
+
+<div id="notify"></div>
+
+<script>
+// ══════════════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════════════
+const API = '';
+const TOKEN_KEY = 'vj_token';
+const ROLE_KEY  = 'vj_role';
+const USER_KEY  = 'vj_user';
+
+let sessions = [];
+let userRole = '';
+let csvFile  = null;
+let chartFile = null;
+let editingId = null;  // null = new, string = editing existing
+
+// ══════════════════════════════════════════════════
+//  HELPERS
+// ══════════════════════════════════════════════════
+const getToken = () => localStorage.getItem(TOKEN_KEY);
+
+function fmtCr(v) {
+  if (v == null) return '—';
+  const abs = Math.abs(v);
+  const sign = v < 0 ? '-' : '';
+  if (abs >= 1e7) return sign + '₹' + (abs/1e7).toFixed(2) + 'Cr';
+  if (abs >= 1e5) return sign + '₹' + (abs/1e5).toFixed(2) + 'L';
+  return sign + '₹' + abs.toLocaleString('en-IN');
+}
+function fmtPnl(v) {
+  if (v == null) return '<span class="muted">—</span>';
+  return `<span class="${v>=0?'green':'red'}">${fmtCr(v)}</span>`;
+}
+function fmtRoi(v, digits=3) {
+  if (v == null) return '<span class="muted">—</span>';
+  return `<span class="${v>=0?'green':'red'}">${v>=0?'+':''}${v.toFixed(digits)}%</span>`;
+}
+function scoreClr(s) {
+  return s >= 75 ? 'var(--green)' : s >= 55 ? 'var(--yellow)' : 'var(--red)';
+}
+function scoreLabel(s) {
+  return s >= 75 ? '🟢 Good' : s >= 55 ? '🟡 Average' : '🔴 Below Par';
+}
+
+let _nid = 0;
+function notify(msg, type='ok') {
+  const el = document.getElementById('notify');
+  el.textContent = msg;
+  el.className = `show ${type}`;
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.className = '', 3000);
+}
+
+// ══════════════════════════════════════════════════
+//  API
+// ══════════════════════════════════════════════════
+async function apiFetch(path, opts={}) {
+  const token = getToken();
+  const headers = { ...opts.headers };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  if (!(opts.body instanceof FormData)) headers['Content-Type'] = 'application/json';
+
+  const res = await fetch(API + path, { ...opts, headers });
+  if (res.status === 401) { doLogout(); return null; }
+  if (!res.ok) {
+    const e = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(e.detail || 'API error');
+  }
+  return res.json();
+}
+
+// ══════════════════════════════════════════════════
+//  AUTH
+// ══════════════════════════════════════════════════
+async function doLogin() {
+  const username = document.getElementById('l-user').value.trim();
+  const password = document.getElementById('l-pass').value;
+  const errEl = document.getElementById('login-err');
+  errEl.textContent = '';
+  try {
+    const data = await apiFetch('/auth/token', { method:'POST', body:JSON.stringify({username,password}) });
+    if (!data) return;
+    localStorage.setItem(TOKEN_KEY, data.access_token);
+    const me = await apiFetch('/auth/me');
+    localStorage.setItem(ROLE_KEY, me.role);
+    localStorage.setItem(USER_KEY, me.username);
+    userRole = me.role;
+    await bootApp();
+  } catch(e) {
+    errEl.textContent = e.message || 'Login failed';
+  }
+}
+document.getElementById('l-pass').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
+
+function doLogout() {
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(ROLE_KEY);
+  localStorage.removeItem(USER_KEY);
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('loading').classList.add('hidden');
+}
+
+// ══════════════════════════════════════════════════
+//  BOOT
+// ══════════════════════════════════════════════════
+async function bootApp() {
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('loading').classList.remove('hidden');
+
+  try {
+    await loadSessions();
+    userRole = localStorage.getItem(ROLE_KEY) || 'readonly';
+    const username = localStorage.getItem(USER_KEY) || '';
+    document.getElementById('h-user').textContent = username;
+    const rd = document.getElementById('role-dot');
+    rd.className = 'role-dot' + (userRole==='admin'?' admin':'');
+    // Hide add/edit for readonly
+    document.getElementById('nav-add').style.opacity = userRole==='admin'?'1':'0.4';
+    document.getElementById('nav-add').style.pointerEvents = userRole==='admin'?'':'none';
+
+    renderOverview();
+    document.getElementById('loading').classList.add('hidden');
+    document.getElementById('app').style.display = 'block';
+  } catch(e) {
+    document.getElementById('load-msg').textContent = 'Connection failed: ' + e.message;
+  }
+}
+
+async function loadSessions() {
+  sessions = await apiFetch('/sessions') || [];
+  populateSelects();
+  const last = sessions[sessions.length-1];
+  document.getElementById('hdr-count').textContent = sessions.length;
+  document.getElementById('hdr-capital').textContent = last?.capital ? fmtCr(last.capital).replace('₹','') : '—';
+}
+
+window.addEventListener('load', async () => {
+  if (getToken()) {
+    await bootApp();
+    if (document.getElementById('app').style.display === 'none') {
+      document.getElementById('loading').classList.add('hidden');
+      document.getElementById('login-screen').style.display = 'flex';
+    }
+  } else {
+    document.getElementById('loading').classList.add('hidden');
+    document.getElementById('login-screen').style.display = 'flex';
+  }
+});
+
+// ══════════════════════════════════════════════════
+//  NAV
+// ══════════════════════════════════════════════════
+function nav(page, el) {
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  if(el) el.classList.add('active');
+  document.getElementById('page-'+page).classList.add('active');
+  if(page==='overview')  renderOverview();
+  if(page==='sessions')  renderSessionsTable();
+  if(page==='detail')    renderDetail();
+  if(page==='scoring')   renderScoring();
+  if(page==='upload')    renderUploadTab();
+  if(page==='charts')    renderChartsPage();
+}
+
+function subTab(id, el) {
+  const tabs = ['dt-summary','dt-strikes','dt-chart','dt-journal','dt-ai'];
+  tabs.forEach(t => document.getElementById(t).style.display = t===id?'block':'none');
+  document.querySelectorAll('.sub-tab').forEach(t => t.classList.remove('active'));
+  if(el) el.classList.add('active');
+}
+
+// ══════════════════════════════════════════════════
+//  SELECTS
+// ══════════════════════════════════════════════════
+function populateSelects() {
+  const opts = sessions.map(s =>
+    `<option value="${s.id}">${s.full||s.date} — ${s.index||s.index_name}</option>`
+  ).join('');
+  ['detail-sel','scoring-sel','cj-sess'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.innerHTML = opts; }
+  });
+  const up = document.getElementById('up-sess');
+  if (up) up.innerHTML = opts;
+  const lastId = sessions.length ? sessions[sessions.length-1].id : '';
+  if (lastId) {
+    ['detail-sel','scoring-sel','cj-sess'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = lastId;
+    });
+  }
+}
+
+// ══════════════════════════════════════════════════
+//  OVERVIEW
+// ══════════════════════════════════════════════════
+function renderOverview() {
+  const valid = sessions.filter(s => s.net_pnl != null);
+  const totalNet  = valid.reduce((a,b) => a+b.net_pnl, 0);
+  const totalGross= valid.reduce((a,b) => a+b.gross_pnl, 0);
+  const wins      = valid.filter(s => s.net_pnl > 0).length;
+  const avgScore  = sessions.length ? sessions.reduce((a,b) => a+(b.scores?.overall||0),0)/sessions.length : 0;
+  const bestS     = valid.length ? valid.reduce((a,b) => a.net_pnl>b.net_pnl?a:b) : null;
+  const totalChg  = valid.reduce((a,b) => a+(b.charges||0), 0);
+  const chargeRatio = totalGross > 0 ? (totalChg/totalGross*100) : 0;
+
+  document.getElementById('ov-cards').innerHTML = `
+    <div class="stat-card ${totalNet>=0?'green-c':'red-c'}">
+      <div class="sc-label">Total Net P&L</div>
+      <div class="sc-value ${totalNet>=0?'green':'red'}">${fmtCr(totalNet)}</div>
+      <div class="sc-sub">${valid.length} sessions with data</div>
+    </div>
+    <div class="stat-card">
+      <div class="sc-label">Win Rate</div>
+      <div class="sc-value accent">${valid.length?Math.round(wins/valid.length*100):'—'}%</div>
+      <div class="sc-sub">${wins}W / ${valid.length-wins}L</div>
+    </div>
+    <div class="stat-card">
+      <div class="sc-label">Avg Score</div>
+      <div class="sc-value" style="color:${scoreClr(avgScore)}">${avgScore.toFixed(0)}/100</div>
+      <div class="sc-sub">${scoreLabel(avgScore)}</div>
+    </div>
+    <div class="stat-card green-c">
+      <div class="sc-label">Best Session</div>
+      <div class="sc-value green">${bestS?fmtCr(bestS.net_pnl):'—'}</div>
+      <div class="sc-sub">${bestS?bestS.full:'—'}</div>
+    </div>
+    <div class="stat-card yellow-c">
+      <div class="sc-label">Total Charges</div>
+      <div class="sc-value yellow">${fmtCr(totalChg)}</div>
+      <div class="sc-sub">Ratio: ${chargeRatio.toFixed(1)}% of gross</div>
+    </div>
+    <div class="stat-card purple-c">
+      <div class="sc-label">Sessions</div>
+      <div class="sc-value accent">${sessions.length}</div>
+      <div class="sc-sub">${sessions.filter(s=>s.index==='Nifty').length}N · ${sessions.filter(s=>s.index==='BankNifty').length}BN · ${sessions.filter(s=>s.index==='Sensex').length}Sx</div>
+    </div>
+  `;
+  drawEquityChart();
+  drawScoreChart();
+  drawCePeChart();
+}
+
+function drawEquityChart() {
+  const c = document.getElementById('equity-chart');
+  const ctx = c.getContext('2d');
+  const valid = sessions.filter(s => s.net_pnl != null);
+  c.width = c.parentElement.offsetWidth - 40; c.height = 160;
+  const W=c.width, H=c.height, pad={l:72,r:20,t:16,b:36};
+  let cum=0;
+  const pts = valid.map(s => { cum+=s.net_pnl; return {label:s.date,val:cum}; });
+  if (!pts.length) return;
+  const vals=pts.map(p=>p.val);
+  const minV=Math.min(0,...vals), maxV=Math.max(0,...vals);
+  const range=maxV-minV||1;
+  ctx.clearRect(0,0,W,H);
+  const toX=i=>pad.l+(i/(pts.length-1||1))*(W-pad.l-pad.r);
+  const toY=v=>pad.t+(1-(v-minV)/range)*(H-pad.t-pad.b);
+  // Zero line
+  ctx.strokeStyle='#223352';ctx.lineWidth=1;ctx.setLineDash([4,4]);
+  ctx.beginPath();ctx.moveTo(pad.l,toY(0));ctx.lineTo(W-pad.r,toY(0));ctx.stroke();
+  ctx.setLineDash([]);
+  // Fill
+  const grad=ctx.createLinearGradient(0,pad.t,0,H-pad.b);
+  grad.addColorStop(0,'rgba(0,230,118,.22)');grad.addColorStop(1,'rgba(0,230,118,.02)');
+  ctx.beginPath();
+  pts.forEach((p,i)=>i===0?ctx.moveTo(toX(i),toY(p.val)):ctx.lineTo(toX(i),toY(p.val)));
+  ctx.lineTo(toX(pts.length-1),H-pad.b);ctx.lineTo(pad.l,H-pad.b);
+  ctx.fillStyle=grad;ctx.fill();
+  // Line
+  ctx.beginPath();ctx.strokeStyle='#00e676';ctx.lineWidth=2.5;
+  pts.forEach((p,i)=>i===0?ctx.moveTo(toX(i),toY(p.val)):ctx.lineTo(toX(i),toY(p.val)));
+  ctx.stroke();
+  // Dots + labels
+  pts.forEach((p,i)=>{
+    ctx.beginPath();ctx.arc(toX(i),toY(p.val),4,0,Math.PI*2);
+    ctx.fillStyle=p.val>=0?'#00e676':'#ff5252';ctx.fill();
+    ctx.fillStyle='#4a6080';ctx.font='10px JetBrains Mono';ctx.textAlign='center';
+    ctx.fillText(p.label,toX(i),H-pad.b+13);
+  });
+  ctx.fillStyle='#4a6080';ctx.font='10px JetBrains Mono';ctx.textAlign='right';
+  [minV,(minV+maxV)/2,maxV].forEach(v=>ctx.fillText(fmtCr(v),pad.l-5,toY(v)+4));
+}
+
+function drawScoreChart() {
+  const c=document.getElementById('score-chart');
+  const ctx=c.getContext('2d');
+  c.width=c.parentElement.offsetWidth-40;c.height=160;
+  const W=c.width,H=c.height,pad={l:28,r:16,t:20,b:36};
+  ctx.clearRect(0,0,W,H);
+  const n=sessions.length; if(!n)return;
+  const bw=Math.min(45,(W-pad.l-pad.r)/n-8);
+  sessions.forEach((s,i)=>{
+    const sc=s.scores?.overall||0;
+    const x=pad.l+i*(W-pad.l-pad.r)/n+(W-pad.l-pad.r)/(n*2)-bw/2;
+    const bH=(sc/100)*(H-pad.t-pad.b);
+    const y=H-pad.b-bH;
+    const col=scoreClr(sc);
+    const gr=ctx.createLinearGradient(0,y,0,H-pad.b);
+    gr.addColorStop(0,col);gr.addColorStop(1,col+'30');
+    ctx.fillStyle=gr;ctx.beginPath();ctx.roundRect(x,y,bw,bH,4);ctx.fill();
+    ctx.fillStyle=col;ctx.font='bold 11px JetBrains Mono';ctx.textAlign='center';
+    ctx.fillText(sc,x+bw/2,y-5);
+    ctx.fillStyle='#4a6080';ctx.font='10px JetBrains Mono';
+    ctx.fillText(s.date,x+bw/2,H-pad.b+13);
+  });
+  [55,75].forEach(v=>{
+    const y=H-pad.b-(v/100)*(H-pad.t-pad.b);
+    ctx.strokeStyle=v===75?'#00e67640':'#ffd74040';ctx.lineWidth=1;ctx.setLineDash([4,4]);
+    ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(W-pad.r,y);ctx.stroke();ctx.setLineDash([]);
+  });
+}
+
+function drawCePeChart() {
+  const c=document.getElementById('cepe-chart');
+  const ctx=c.getContext('2d');
+  c.width=c.parentElement.offsetWidth-40;c.height=130;
+  const W=c.width,H=c.height,pad={l:72,r:16,t:16,b:36};
+  ctx.clearRect(0,0,W,H);
+  const valid=sessions.filter(s=>s.ce_pnl!=null&&s.pe_pnl!=null);
+  if(!valid.length)return;
+  const n=valid.length;
+  const allVals=[...valid.map(s=>s.ce_pnl),...valid.map(s=>s.pe_pnl),0];
+  const minV=Math.min(...allVals),maxV=Math.max(...allVals);
+  const range=maxV-minV||1;
+  const toX=i=>pad.l+i*(W-pad.l-pad.r)/(n);
+  const toY=v=>pad.t+(1-(v-minV)/range)*(H-pad.t-pad.b);
+  const bw=(W-pad.l-pad.r)/n*0.35;
+  // Zero line
+  ctx.strokeStyle='#223352';ctx.lineWidth=1;ctx.setLineDash([4,4]);
+  ctx.beginPath();ctx.moveTo(pad.l,toY(0));ctx.lineTo(W-pad.r,toY(0));ctx.stroke();ctx.setLineDash([]);
+  valid.forEach((s,i)=>{
+    const cx=toX(i)+bw*0.1;
+    const px=toX(i)+bw*1.2;
+    const zero=toY(0);
+    // CE bar
+    const cy=s.ce_pnl>=0?toY(s.ce_pnl):zero;
+    const ch=Math.abs(toY(s.ce_pnl)-zero);
+    ctx.fillStyle=s.ce_pnl>=0?'rgba(0,230,118,.7)':'rgba(255,82,82,.7)';
+    ctx.beginPath();ctx.roundRect(cx,cy,bw,ch||1,2);ctx.fill();
+    // PE bar
+    const py2=s.pe_pnl>=0?toY(s.pe_pnl):zero;
+    const ph=Math.abs(toY(s.pe_pnl)-zero);
+    ctx.fillStyle=s.pe_pnl>=0?'rgba(0,229,255,.7)':'rgba(255,107,107,.7)';
+    ctx.beginPath();ctx.roundRect(px,py2,bw,ph||1,2);ctx.fill();
+    // Label
+    ctx.fillStyle='#4a6080';ctx.font='10px JetBrains Mono';ctx.textAlign='center';
+    ctx.fillText(s.date,toX(i)+bw,H-pad.b+13);
+  });
+  // Legend
+  ctx.fillStyle='rgba(0,230,118,.8)';ctx.fillRect(pad.l,6,10,8);
+  ctx.fillStyle='#6a80a0';ctx.font='10px JetBrains Mono';ctx.textAlign='left';ctx.fillText('CE',pad.l+13,13);
+  ctx.fillStyle='rgba(0,229,255,.8)';ctx.fillRect(pad.l+36,6,10,8);
+  ctx.fillStyle='#6a80a0';ctx.fillText('PE',pad.l+49,13);
+  // Y axis labels
+  ctx.textAlign='right';
+  [minV,(minV+maxV)/2,maxV].forEach(v=>ctx.fillText(fmtCr(v),pad.l-5,toY(v)+4));
+}
+
+// ══════════════════════════════════════════════════
+//  SESSIONS TABLE
+// ══════════════════════════════════════════════════
+function renderSessionsTable() {
+  const q = (document.getElementById('sess-search')?.value||'').toLowerCase();
+  const filtered = sessions.filter(s =>
+    !q || (s.full||'').toLowerCase().includes(q) ||
+    (s.index||'').toLowerCase().includes(q) ||
+    (s.note||'').toLowerCase().includes(q)
+  );
+  document.getElementById('sess-tbody').innerHTML = filtered.map(s => `
+    <tr onclick="goDetail('${s.id}')">
+      <td><b>${s.full||s.date}</b>${s.csv_filename?` <span class="badge badge-blue" style="font-size:9px">CSV</span>`:''}</td>
+      <td><span class="badge badge-blue">${s.index||s.index_name||'—'}</span></td>
+      <td class="accent">${s.vix!=null?s.vix.toFixed(2):'—'}</td>
+      <td>${fmtCr(s.capital)}</td>
+      <td>${fmtPnl(s.gross_pnl)}</td>
+      <td>${fmtPnl(s.net_pnl)}</td>
+      <td>${fmtRoi(s.net_roi)}</td>
+      <td>${s.charges!=null?`<span class="yellow">${fmtCr(s.charges)}</span>`:'—'}</td>
+      <td><b style="color:${scoreClr(s.scores?.overall||0)}">${s.scores?.overall||'—'}</b></td>
+      <td onclick="event.stopPropagation()">
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-ghost btn-sm" onclick="goDetail('${s.id}')">View</button>
+          ${userRole==='admin'?`<button class="btn btn-ghost btn-sm" onclick="openEditModal('${s.id}')">Edit</button>`:''}
+        </div>
+      </td>
+    </tr>`).join('');
+}
+
+function goDetail(id) {
+  document.getElementById('detail-sel').value = id;
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item')[2].classList.add('active');
+  document.getElementById('page-detail').classList.add('active');
+  renderDetail();
+}
+
+// ══════════════════════════════════════════════════
+//  DETAIL
+// ══════════════════════════════════════════════════
+function renderDetail() {
+  const id = document.getElementById('detail-sel').value;
+  const s = sessions.find(x=>x.id===id);
+  if (!s) return;
+  document.getElementById('edit-btn').style.display = userRole==='admin'?'':'none';
+
+  // Summary tab
+  document.getElementById('dt-summary').innerHTML = `
+    <div class="stat-grid">
+      <div class="stat-card ${(s.gross_pnl||0)>=0?'green-c':'red-c'}">
+        <div class="sc-label">Gross P&L</div>
+        <div class="sc-value ${(s.gross_pnl||0)>=0?'green':'red'}">${fmtCr(s.gross_pnl)}</div>
+      </div>
+      <div class="stat-card ${(s.net_pnl||0)>=0?'green-c':'red-c'}">
+        <div class="sc-label">Net P&L</div>
+        <div class="sc-value ${(s.net_pnl||0)>=0?'green':'red'}">${fmtCr(s.net_pnl)}</div>
+      </div>
+      <div class="stat-card ${(s.net_roi||0)>=0?'green-c':'red-c'}">
+        <div class="sc-label">Net ROI</div>
+        <div class="sc-value ${(s.net_roi||0)>=0?'green':'red'}">${s.net_roi!=null?(s.net_roi>=0?'+':'')+s.net_roi.toFixed(3)+'%':'—'}</div>
+      </div>
+      <div class="stat-card yellow-c">
+        <div class="sc-label">Charges</div>
+        <div class="sc-value yellow">${fmtCr(s.charges)}</div>
+        <div class="sc-sub">${s.gross_pnl&&s.charges?(s.charges/s.gross_pnl*100).toFixed(1)+'% of gross':''}</div>
+      </div>
+      <div class="stat-card">
+        <div class="sc-label">VIX</div>
+        <div class="sc-value accent">${s.vix!=null?s.vix.toFixed(2):'—'}</div>
+      </div>
+      <div class="stat-card">
+        <div class="sc-label">Capital</div>
+        <div class="sc-value">${fmtCr(s.capital)}</div>
+      </div>
+      <div class="stat-card ${(s.ce_pnl||0)>=0?'green-c':'red-c'}">
+        <div class="sc-label">CE P&L</div>
+        <div class="sc-value ${(s.ce_pnl||0)>=0?'green':'red'}">${fmtCr(s.ce_pnl)}</div>
+      </div>
+      <div class="stat-card ${(s.pe_pnl||0)>=0?'green-c':'red-c'}">
+        <div class="sc-label">PE P&L</div>
+        <div class="sc-value ${(s.pe_pnl||0)>=0?'green':'red'}">${fmtCr(s.pe_pnl)}</div>
+      </div>
+    </div>
+    <div class="g3" style="margin-bottom:20px">
+      <div class="stat-card">
+        <div class="sc-label">Market Toughness</div>
+        <div class="sc-value accent">${s.mt!=null?s.mt.toFixed(2):'—'}/10</div>
+      </div>
+      <div class="stat-card">
+        <div class="sc-label">Orders</div>
+        <div class="sc-value">${s.executed!=null?s.executed:'—'}</div>
+        <div class="sc-sub">${s.rejected!=null?s.rejected+' rejected':''}</div>
+      </div>
+      <div class="stat-card ${(s.carry_out||0)>0?'yellow-c':'green-c'}">
+        <div class="sc-label">Carry Out</div>
+        <div class="sc-value ${(s.carry_out||0)>0?'yellow':'green'}">${s.carry_out||0} legs</div>
+      </div>
+    </div>
+    <div class="g2" style="margin-bottom:18px">
+      <div>
+        <div class="sec-title">Violations</div>
+        ${(s.violations||[]).map(v=>`<div class="list-item viol">${v}</div>`).join('')||'<div class="list-item viol" style="opacity:.4">None recorded</div>'}
+      </div>
+      <div>
+        <div class="sec-title">Strengths</div>
+        ${(s.strengths||[]).map(v=>`<div class="list-item str">${v}</div>`).join('')||'<div class="list-item str" style="opacity:.4">None recorded</div>'}
+      </div>
+    </div>
+    ${s.note?`<div class="info-box"><b>Note:</b> ${s.note}</div>`:''}
+    ${s.csv_filename?`<div class="info-box"><b>📄 CSV:</b> ${s.csv_filename}</div>`:''}
+  `;
+
+  // Strikes tab
+  const strikes = s.strikes || [];
+  if (strikes.length) {
+    document.getElementById('dt-strikes').innerHTML = `
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Symbol</th><th>Type</th><th>Strike</th><th>Expiry</th>
+            <th>Buy VWAP</th><th>Sell VWAP</th><th>Matched Qty</th><th>Realized P&L</th><th>Status</th></tr></thead>
+          <tbody>
+            ${strikes.map(st=>`<tr>
+              <td style="font-size:11px">${st.symbol}</td>
+              <td><span class="badge ${st.option_type==='CE'?'badge-blue':'badge-yellow'}">${st.option_type||'—'}</span></td>
+              <td>${st.strike||'—'}</td>
+              <td style="font-size:11px">${st.expiry||'—'}</td>
+              <td>${st.buy_vwap||'—'}</td>
+              <td>${st.sell_vwap||'—'}</td>
+              <td>${st.matched_qty||0}</td>
+              <td>${fmtPnl(st.realized)}</td>
+              <td>${st.is_carry?'<span class="badge badge-yellow">CARRY</span>':'<span class="badge badge-green">CLOSED</span>'}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`;
+  } else {
+    document.getElementById('dt-strikes').innerHTML = `<div class="info-box">No strike data. Upload a CSV to parse strikes.</div>`;
+  }
+
+  // Chart tab
+  if (s.chart_image) {
+    document.getElementById('dt-chart').innerHTML = `
+      <div class="chart-img-wrap">
+        <img src="${s.chart_image}" alt="Day chart">
+      </div>
+      <div style="margin-top:10px;color:var(--muted2);font-size:12px;font-family:var(--font-mono)">
+        Day chart for ${s.full||s.date} · ${s.index||s.index_name}
+      </div>`;
+  } else {
+    document.getElementById('dt-chart').innerHTML = `<div class="info-box">No chart uploaded. Go to Charts &amp; Journal to upload one.</div>`;
+  }
+
+  // Journal tab
+  const journal = s.journal || '';
+  document.getElementById('dt-journal').innerHTML = journal
+    ? `<div class="journal-view">${escHtml(journal)}</div>`
+    : `<div class="info-box">No journal entry. Go to Charts &amp; Journal to add notes.</div>`;
+
+  // AI tab
+  document.getElementById('dt-ai').innerHTML = s.ai_commentary
+    ? `<div class="info-box" style="line-height:1.8">${s.ai_commentary.replace(/\n/g,'<br>')}</div>`
+    : `<div class="info-box">No AI commentary yet. Click "✦ AI Commentary" above to generate.</div>`;
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ══════════════════════════════════════════════════
+//  AI COMMENTARY
+// ══════════════════════════════════════════════════
+async function generateAI() {
+  if (userRole !== 'admin') { notify('Admin only','err'); return; }
+  const id = document.getElementById('detail-sel').value;
+  const btn = document.getElementById('ai-btn');
+  btn.innerHTML = '<span class="spinner light"></span> Generating…';
+  btn.disabled = true;
+  try {
+    await apiFetch(`/ai-commentary/${id}`, { method:'POST' });
+    await loadSessions();
+    renderDetail();
+    notify('AI commentary generated','ok');
+  } catch(e) {
+    notify(e.message,'err');
+  } finally {
+    btn.innerHTML = '✦ AI Commentary';
+    btn.disabled = false;
+  }
+}
+
+// ══════════════════════════════════════════════════
+//  SCORING
+// ══════════════════════════════════════════════════
+function renderScoring() {
+  const id = document.getElementById('scoring-sel').value;
+  const s = sessions.find(x=>x.id===id);
+  if (!s) return;
+  const sc = s.scores || {};
+  const dims = [
+    {key:'discipline', label:'Discipline',          w:25},
+    {key:'cap_eff',    label:'Capital Efficiency',  w:20},
+    {key:'trade_q',    label:'Trade Quality',       w:20},
+    {key:'mkt_align',  label:'Market Alignment',    w:15},
+    {key:'vol_handle', label:'Volatility Handling', w:10},
+    {key:'peer_cmp',   label:'Peer Comparison',     w:10},
+  ];
+  document.getElementById('scoring-content').innerHTML = `
+    <div class="g3" style="margin-bottom:20px">
+      <div class="stat-card">
+        <div class="sc-label">Overall Score</div>
+        <div class="sc-value" style="color:${scoreClr(sc.overall||0)}">${sc.overall||'—'}/100</div>
+        <div class="sc-sub">${scoreLabel(sc.overall||0)}</div>
+      </div>
+      <div class="stat-card">
+        <div class="sc-label">Market Toughness</div>
+        <div class="sc-value accent">${s.mt!=null?s.mt.toFixed(2):'—'}/10</div>
+      </div>
+      <div class="stat-card">
+        <div class="sc-label">Session</div>
+        <div class="sc-value" style="font-size:16px">${s.date}</div>
+        <div class="sc-sub">${s.index||s.index_name} Expiry</div>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Six-Dimension Breakdown</div>
+      <div class="score-rows" style="padding:4px 0">
+        ${dims.map(d=>{
+          const raw=sc[d.key]||0; const col=scoreClr(raw);
+          return `<div class="score-row">
+            <div class="score-lbl">${d.label} <span class="muted">(${d.w}%)</span></div>
+            <div class="score-bar-bg"><div class="score-bar-fill" style="width:${raw}%;background:linear-gradient(90deg,${col},${col}55)"></div></div>
+            <div class="score-num" style="color:${col}">${raw}</div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+    <div class="g2">
+      <div>
+        <div class="sec-title">Violations</div>
+        ${(s.violations||[]).map(v=>`<div class="list-item viol">${v}</div>`).join('')||'<div class="muted" style="font-size:13px">None</div>'}
+      </div>
+      <div>
+        <div class="sec-title">Strengths</div>
+        ${(s.strengths||[]).map(v=>`<div class="list-item str">${v}</div>`).join('')||'<div class="muted" style="font-size:13px">None</div>'}
+      </div>
+    </div>
+  `;
+}
+
+// ══════════════════════════════════════════════════
+//  UPLOAD CSV
+// ══════════════════════════════════════════════════
+function renderUploadTab() {
+  const sel = document.getElementById('up-sess');
+  if (sel) sel.innerHTML = sessions.map(s =>
+    `<option value="${s.id}">${s.full||s.date} — ${s.index||s.index_name}</option>`
+  ).join('');
+}
+
+function handleFileSelect(input) {
+  csvFile = input.files[0];
+  if (csvFile) {
+    document.getElementById('up-fname').textContent = csvFile.name;
+    document.getElementById('up-btn').disabled = false;
+  }
+}
+
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('up-zone').classList.remove('drag');
+  const file = e.dataTransfer.files[0];
+  if (file) {
+    csvFile = file;
+    document.getElementById('up-fname').textContent = file.name;
+    document.getElementById('up-btn').disabled = false;
+  }
+}
+
+async function uploadCSV() {
+  if (!csvFile) return;
+  const sessId = document.getElementById('up-sess').value;
+  if (!sessId) { notify('Select a session first','err'); return; }
+
+  const capital = parseFloat(document.getElementById('up-capital').value);
+  if (capital > 0) {
+    const s = sessions.find(x=>x.id===sessId);
+    if (s) {
+      await apiFetch('/sessions', { method:'POST', body:JSON.stringify({
+        ...s, index_name:s.index||s.index_name, capital,
+        scores:{overall:s.scores?.overall||0,...s.scores}
+      })}).catch(()=>{});
+    }
+  }
+
+  const btn = document.getElementById('up-btn');
+  btn.innerHTML = '<span class="spinner"></span> Parsing…';
+  btn.disabled = true;
+
+  const fd = new FormData();
+  fd.append('file', csvFile);
+
+  try {
+    const token = getToken();
+    const res = await fetch(`${API}/upload-csv/${sessId}`, {
+      method:'POST', headers:{'Authorization':`Bearer ${token}`}, body:fd });
+    if (!res.ok) { const e=await res.json(); throw new Error(e.detail); }
+    const data = await res.json();
+    await loadSessions();
+    populateSelects();
+
+    const ch = data.charges_breakdown;
+    document.getElementById('up-result').innerHTML = `
+      <div class="info-box success">
+        <b>✅ ${data.message}</b><br>
+        Gross P&L: ${fmtCr(data.gross_pnl)} &nbsp;|&nbsp;
+        Net P&L: ${fmtCr(data.net_pnl)} &nbsp;|&nbsp;
+        Charges: ${fmtCr(data.total_charges)}<br>
+        <span class="muted">STT: ₹${ch.stt} &nbsp; Exchange: ₹${ch.exchange} &nbsp; SEBI: ₹${ch.sebi.toFixed(2)} &nbsp; Stamp: ₹${ch.stamp} &nbsp; GST: ₹${ch.gst}</span>
+        ${data.carry_positions?.length?`<br><b class="yellow">⚠ ${data.carry_positions.length} carry position(s)</b>`:''}
+        ${data.warnings?.length?`<br><span class="red">Warnings: ${data.warnings.join(' | ')}</span>`:''}
+      </div>
+      <div class="tbl-wrap" style="max-height:320px;overflow-y:auto">
+        <table>
+          <thead><tr><th>Symbol</th><th>Type</th><th>Realized P&L</th><th>Buy VWAP</th><th>Sell VWAP</th><th>Qty</th></tr></thead>
+          <tbody>
+            ${(data.strikes||[]).map(st=>`<tr>
+              <td style="font-size:11px">${st.symbol}</td>
+              <td><span class="badge ${st.option_type==='CE'?'badge-blue':'badge-yellow'}">${st.option_type||'—'}</span></td>
+              <td>${fmtPnl(st.realized)}</td>
+              <td>${st.buy_vwap||'—'}</td>
+              <td>${st.sell_vwap||'—'}</td>
+              <td>${st.matched_qty||0}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`;
+    notify('CSV parsed successfully','ok');
+  } catch(e) {
+    document.getElementById('up-result').innerHTML = `<div class="info-box err"><b>❌ Parse failed:</b> ${e.message}</div>`;
+    notify(e.message,'err');
+  } finally {
+    btn.innerHTML = '↑ Parse &amp; Upload';
+    btn.disabled = false;
+  }
+}
+
+// ══════════════════════════════════════════════════
+//  CHARTS & JOURNAL PAGE
+// ══════════════════════════════════════════════════
+function renderChartsPage() {
+  const id = document.getElementById('cj-sess').value;
+  const s = sessions.find(x=>x.id===id);
+  if (!s) return;
+
+  // Chart section
+  if (s.chart_image) {
+    document.getElementById('cj-chart-area').innerHTML = `
+      <div class="chart-img-wrap" style="margin-bottom:14px">
+        <img src="${s.chart_image}" alt="Day chart">
+      </div>`;
+    document.getElementById('cj-del-btn').style.display = '';
+  } else {
+    document.getElementById('cj-chart-area').innerHTML = '';
+    document.getElementById('cj-del-btn').style.display = 'none';
+  }
+  document.getElementById('cj-upload-btn').disabled = !chartFile;
+
+  // Journal
+  document.getElementById('cj-journal-edit').value = s.journal || '';
+  document.getElementById('cj-journal-area').innerHTML = s.journal
+    ? `<div class="journal-view" style="margin-bottom:12px">${escHtml(s.journal)}</div>`
+    : '';
+}
+
+function handleChartSelect(input) {
+  chartFile = input.files[0];
+  if (chartFile) {
+    document.getElementById('cj-fname').textContent = chartFile.name;
+    document.getElementById('cj-upload-btn').disabled = false;
+  }
+}
+
+function handleChartDrop(e) {
+  e.preventDefault();
+  document.getElementById('cj-drop').classList.remove('drag');
+  const file = e.dataTransfer.files[0];
+  if (file && file.type.startsWith('image/')) {
+    chartFile = file;
+    document.getElementById('cj-fname').textContent = file.name;
+    document.getElementById('cj-upload-btn').disabled = false;
+  } else {
+    notify('Please drop an image file','err');
+  }
+}
+
+async function uploadChart() {
+  if (!chartFile) return;
+  const id = document.getElementById('cj-sess').value;
+  const btn = document.getElementById('cj-upload-btn');
+  btn.innerHTML = '<span class="spinner"></span>';
+  btn.disabled = true;
+  try {
+    const fd = new FormData();
+    fd.append('file', chartFile);
+    const token = getToken();
+    const res = await fetch(`${API}/upload-chart/${id}`, {
+      method:'POST', headers:{'Authorization':`Bearer ${token}`}, body:fd });
+    if (!res.ok) { const e=await res.json(); throw new Error(e.detail); }
+    chartFile = null;
+    document.getElementById('cj-fname').textContent = '';
+    await loadSessions();
+    renderChartsPage();
+    notify('Chart uploaded','ok');
+  } catch(e) {
+    notify(e.message,'err');
+  } finally {
+    btn.innerHTML = 'Upload Chart';
+    btn.disabled = !chartFile;
+  }
+}
+
+async function deleteChart() {
+  const id = document.getElementById('cj-sess').value;
+  if (!confirm('Delete chart image for this session?')) return;
+  try {
+    await apiFetch(`/upload-chart/${id}`, { method:'DELETE' });
+    await loadSessions();
+    renderChartsPage();
+    notify('Chart deleted','ok');
+  } catch(e) {
+    notify(e.message,'err');
+  }
+}
+
+async function saveJournal() {
+  const id = document.getElementById('cj-sess').value;
+  const s = sessions.find(x=>x.id===id);
+  if (!s) return;
+  const journal = document.getElementById('cj-journal-edit').value;
+  try {
+    await apiFetch('/sessions', { method:'POST', body:JSON.stringify({
+      ...s, index_name:s.index||s.index_name, journal,
+      scores:{overall:s.scores?.overall||0,...s.scores}
+    })});
+    await loadSessions();
+    renderChartsPage();
+    notify('Journal saved','ok');
+  } catch(e) {
+    notify(e.message,'err');
+  }
+}
+
+// ══════════════════════════════════════════════════
+//  ADD / EDIT SESSION MODAL
+// ══════════════════════════════════════════════════
+function openAddModal() {
+  if (userRole !== 'admin') { notify('Admin only','err'); return; }
+  editingId = null;
+  document.getElementById('modal-title').textContent = '+ New Session';
+  document.getElementById('del-btn').style.display = 'none';
+  document.getElementById('modal-err').textContent = '';
+  // Clear form
+  ['f-date','f-vix','f-capital','f-gross','f-charges','f-ce','f-pe',
+   'f-executed','f-rejected','f-mt','f-score','f-disc','f-capeff',
+   'f-trq','f-mka','f-volh','f-peer','f-note'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('f-carry').value = '0';
+  document.getElementById('f-violations').value = '';
+  document.getElementById('f-strengths').value = '';
+  document.getElementById('f-index').value = 'Nifty';
+  document.getElementById('sess-modal').classList.add('open');
+}
+
+function openEditModal(id) {
+  if (userRole !== 'admin') { notify('Admin only','err'); return; }
+  const targetId = id || document.getElementById('detail-sel').value;
+  const s = sessions.find(x=>x.id===targetId);
+  if (!s) return;
+  editingId = targetId;
+  document.getElementById('modal-title').textContent = `Edit — ${s.full||s.date}`;
+  document.getElementById('del-btn').style.display = '';
+  document.getElementById('modal-err').textContent = '';
+  document.getElementById('f-date').value = s.id;
+  document.getElementById('f-index').value = s.index||s.index_name||'Nifty';
+  document.getElementById('f-vix').value = s.vix||'';
+  document.getElementById('f-capital').value = s.capital||'';
+  document.getElementById('f-gross').value = s.gross_pnl||'';
+  document.getElementById('f-charges').value = s.charges||'';
+  document.getElementById('f-ce').value = s.ce_pnl||'';
+  document.getElementById('f-pe').value = s.pe_pnl||'';
+  document.getElementById('f-executed').value = s.executed||'';
+  document.getElementById('f-rejected').value = s.rejected||'';
+  document.getElementById('f-mt').value = s.mt||'';
+  document.getElementById('f-score').value = s.scores?.overall||'';
+  document.getElementById('f-disc').value = s.scores?.discipline||'';
+  document.getElementById('f-capeff').value = s.scores?.cap_eff||'';
+  document.getElementById('f-trq').value = s.scores?.trade_q||'';
+  document.getElementById('f-mka').value = s.scores?.mkt_align||'';
+  document.getElementById('f-volh').value = s.scores?.vol_handle||'';
+  document.getElementById('f-peer').value = s.scores?.peer_cmp||'';
+  document.getElementById('f-carry').value = s.carry_out||0;
+  document.getElementById('f-note').value = s.note||'';
+  document.getElementById('f-violations').value = (s.violations||[]).join('\n');
+  document.getElementById('f-strengths').value = (s.strengths||[]).join('\n');
+  document.getElementById('sess-modal').classList.add('open');
+}
+
+function closeSessModal() {
+  document.getElementById('sess-modal').classList.remove('open');
+  editingId = null;
+}
+
+async function saveSession() {
+  const date = editingId || document.getElementById('f-date').value;
+  if (!date) { document.getElementById('modal-err').textContent='Date is required'; return; }
+  const d = new Date(date);
+  const mos = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const gross   = parseFloat(document.getElementById('f-gross').value)   || null;
+  const charges = parseFloat(document.getElementById('f-charges').value) || null;
+  const capital = parseFloat(document.getElementById('f-capital').value) || null;
+  const net = (gross!=null && charges!=null) ? gross - charges : null;
+
+  const body = {
+    id:         date,
+    date:       `${d.getDate().toString().padStart(2,'0')} ${mos[d.getMonth()]}`,
+    full:       `${d.getDate().toString().padStart(2,'0')}-${mos[d.getMonth()]}-${d.getFullYear()}`,
+    index_name: document.getElementById('f-index').value,
+    dte: 0, vix: parseFloat(document.getElementById('f-vix').value)||null,
+    capital, gross_pnl:gross, net_pnl:net,
+    net_roi:  (capital&&net)  ? +(net/capital*100).toFixed(4)   : null,
+    gross_roi:(capital&&gross)? +(gross/capital*100).toFixed(4) : null,
+    ce_pnl:  parseFloat(document.getElementById('f-ce').value)||null,
+    pe_pnl:  parseFloat(document.getElementById('f-pe').value)||null,
+    charges, executed: parseInt(document.getElementById('f-executed').value)||null,
+    rejected: parseInt(document.getElementById('f-rejected').value)||0,
+    mt:       parseFloat(document.getElementById('f-mt').value)||null,
+    carry_out:parseInt(document.getElementById('f-carry').value)||0,
+    note:     document.getElementById('f-note').value||null,
+    peer_rois:[], journal: null,
+    scores:{
+      overall:    parseInt(document.getElementById('f-score').value)||0,
+      discipline: parseInt(document.getElementById('f-disc').value)||0,
+      cap_eff:    parseInt(document.getElementById('f-capeff').value)||0,
+      trade_q:    parseInt(document.getElementById('f-trq').value)||0,
+      mkt_align:  parseInt(document.getElementById('f-mka').value)||0,
+      vol_handle: parseInt(document.getElementById('f-volh').value)||0,
+      peer_cmp:   parseInt(document.getElementById('f-peer').value)||0,
+    },
+    violations: document.getElementById('f-violations').value.split('\n').filter(x=>x.trim()),
+    strengths:  document.getElementById('f-strengths').value.split('\n').filter(x=>x.trim()),
+  };
+  // Preserve existing journal if editing
+  if (editingId) {
+    const existing = sessions.find(x=>x.id===editingId);
+    if (existing?.journal) body.journal = existing.journal;
+  }
+
+  const btn = document.querySelector('#sess-modal .btn-primary');
+  btn.innerHTML = '<span class="spinner"></span> Saving…';
+  btn.disabled = true;
+
+  try {
+    await apiFetch('/sessions', { method:'POST', body:JSON.stringify(body) });
+    await loadSessions();
+    renderOverview();
+    renderSessionsTable();
+    closeSessModal();
+    notify(editingId?'Session updated':'Session created','ok');
+  } catch(e) {
+    document.getElementById('modal-err').textContent = e.message;
+  } finally {
+    btn.innerHTML = '💾 Save Session';
+    btn.disabled = false;
+  }
+}
+
+async function deleteSession() {
+  if (!editingId) return;
+  const s = sessions.find(x=>x.id===editingId);
+  if (!confirm(`Delete session ${s?.full||editingId}? This cannot be undone.`)) return;
+  try {
+    await apiFetch(`/sessions/${editingId}`, { method:'DELETE' });
+    await loadSessions();
+    renderOverview();
+    closeSessModal();
+    notify('Session deleted','ok');
+  } catch(e) {
+    notify(e.message,'err');
+  }
+}
+
+// Close overlay on backdrop click
+document.getElementById('sess-modal').addEventListener('click', function(e) {
+  if (e.target === this) closeSessModal();
+});
+
+window.addEventListener('resize', () => {
+  if (document.getElementById('page-overview').classList.contains('active')) {
+    drawEquityChart(); drawScoreChart(); drawCePeChart();
+  }
+});
+</script>
+</body>
+</html>

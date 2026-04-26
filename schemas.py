@@ -34,36 +34,7 @@ class SessionCreate(BaseModel):
     scores:      ScoresModel     = ScoresModel()
     violations:  List[str]       = []
     strengths:   List[str]       = []
-
-class SessionOut(BaseModel):
-    id:          str
-    date:        str
-    full:        str
-    index_name:  str
-    dte:         int
-    vix:         Optional[float]
-    capital:     Optional[float]
-    gross_pnl:   Optional[float]
-    net_pnl:     Optional[float]
-    net_roi:     Optional[float]
-    gross_roi:   Optional[float]
-    ce_pnl:      Optional[float]
-    pe_pnl:      Optional[float]
-    charges:     Optional[float]
-    executed:    Optional[int]
-    rejected:    Optional[int]
-    mt:          Optional[float]
-    carry_out:   int
-    note:        Optional[str]
-    peer_rois:   List[float]
-    scores:      Dict[str, Any]
-    violations:  List[str]
-    strengths:   List[str]
-    ai_commentary: Optional[str]
-    csv_filename:  Optional[str]
-
-    class Config:
-        from_attributes = True
+    journal:     Optional[str]   = None
 
 class TokenRequest(BaseModel):
     username: str
@@ -72,23 +43,6 @@ class TokenRequest(BaseModel):
 class TokenResponse(BaseModel):
     access_token: str
     token_type:   str = "bearer"
-
-class CSVUploadResult(BaseModel):
-    session_id:   str
-    gross_pnl:    float
-    net_pnl:      float
-    net_roi:      float
-    ce_pnl:       float
-    pe_pnl:       float
-    charges_breakdown: Dict[str, float]
-    total_charges: float
-    executed:     int
-    rejected:     int
-    strikes:      List[Dict[str, Any]]
-    warnings:     List[str]
-
-class AICommentaryRequest(BaseModel):
-    session_id: str
 
 class MessageResponse(BaseModel):
     message: str

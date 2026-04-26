@@ -1,7 +1,6 @@
 """
-STOXXO Order Book CSV Parser
-Parses raw broker execution log, computes VWAP per strike,
-calculates realized P&L, and invokes charge engine.
+STOXXO / XTS Order Book CSV Parser — Robust multi-format version
+Handles STOXXO, Jainam, Zerodha, and generic broker CSV formats.
 """
 import csv
 import re
@@ -10,130 +9,162 @@ from collections import defaultdict
 from charge_engine import compute_charges
 
 
+# ── Column name alias map ──────────────────────────────────────────
+SYMBOL_COLS   = ['symbol','tradingsymbol','trading_symbol','scripname','scrip_name',
+                 'instrument','instrumentname','instrument_name','stock']
+SIDE_COLS     = ['side','transactiontype','transaction_type','buysell','buy/sell',
+                 'type','order_type','ordertype','b/s','direction','buysell']
+QTY_COLS      = ['tradeqty','trade_qty','qty','filledqty','filled_qty','quantity',
+                 'tradedqty','traded_qty','executedqty','executed_qty','lotsize','lots',
+                 'totalqty','total_qty','tradequantity']
+PRICE_COLS    = ['tradeprice','trade_price','price','averageprice','average_price',
+                 'avg_price','avgprice','executedprice','executed_price','tradedprice',
+                 'traded_price','lastprice','last_price','fillprice','fill_price','rate']
+STATUS_COLS   = ['status','orderstatus','order_status','state','orderstate']
+
+def _get(row, cols):
+    for c in cols:
+        if c in row:
+            v = row[c]
+            return v if v not in (None,'','N/A','NA','-') else None
+    return None
+
+def _norm_cols(row):
+    """Normalize column names: lower, strip, collapse separators."""
+    return {re.sub(r'[\s_\-\.]+','',k.strip().lower()): v.strip() if isinstance(v,str) else v
+            for k,v in row.items()}
+
+
 def parse_symbol(symbol: str) -> dict:
-    """
-    Parse STOXXO option symbol like NIFTY2640722600PE or SENSEX2641677800CE
-    Returns: {index, expiry, strike, option_type}
-    """
+    """Parse NSE/BSE option symbol. Handles NIFTY, BANKNIFTY, SENSEX, FINNIFTY, MIDCPNIFTY."""
+    s = symbol.upper().strip()
+    # Standard compact format: INDEX + YYMMDD + STRIKE + CE/PE
     m = re.match(
-        r'^(NIFTY|BANKNIFTY|SENSEX|FINNIFTY|MIDCPNIFTY)(\d{5,6})(\d{4,6})(CE|PE)$',
-        symbol.upper()
-    )
-    if not m:
-        return {"index": symbol, "expiry": None, "strike": None, "option_type": None}
+        r'^(NIFTY|BANKNIFTY|SENSEX|FINNIFTY|MIDCPNIFTY|BANKEX)(\d{5,6})(\d{4,6})(CE|PE)$', s)
+    if m:
+        index, expiry_raw, strike, opt_type = m.groups()
+        try:
+            yr = 2000 + int(expiry_raw[:2])
+            mo = int(expiry_raw[2:4])
+            dy = int(expiry_raw[4:])
+            expiry = f"{dy:02d}/{mo:02d}/{yr}"
+        except Exception:
+            expiry = expiry_raw
+        return {"index": index, "expiry": expiry, "strike": int(strike), "option_type": opt_type}
 
-    index      = m.group(1)
-    expiry_raw = m.group(2)   # YMMDD format
-    strike     = int(m.group(3))
-    opt_type   = m.group(4)
+    # Alternate: INDEX + DD + MON + YY + STRIKE + CE/PE (e.g. NIFTY24APR2526000CE)
+    m2 = re.match(
+        r'^(NIFTY|BANKNIFTY|SENSEX|FINNIFTY|MIDCPNIFTY|BANKEX)(\d{2})([A-Z]{3})(\d{2,4})(\d{4,6})(CE|PE)$', s)
+    if m2:
+        index, dd, mon, yr, strike, opt_type = m2.groups()
+        return {"index": index, "expiry": f"{dd}/{mon}/{yr}", "strike": int(strike), "option_type": opt_type}
 
-    # Parse expiry
-    try:
-        year  = 2000 + int(expiry_raw[:2])
-        month = int(expiry_raw[2:4])
-        day   = int(expiry_raw[4:])
-        expiry = f"{day:02d}/{month:02d}/{year}"
-    except Exception:
-        expiry = expiry_raw
+    return {"index": s.split('2')[0] if '2' in s else s, "expiry": None, "strike": None, "option_type": None}
 
-    return {
-        "index": index,
-        "expiry": expiry,
-        "strike": strike,
-        "option_type": opt_type
-    }
+
+def _detect_delimiter(text: str) -> str:
+    sample = text[:3000]
+    counts = {d: sample.count(d) for d in [',', '\t', ';', '|']}
+    return max(counts, key=counts.get)
+
+
+def _is_executed(status: str) -> bool:
+    if not status:
+        return True   # no status column → treat all as executed
+    s = status.upper().strip()
+    return any(x in s for x in ('COMPLETE','TRADED','FILLED','EXECUTED','DONE','SUCCESS','FULL'))
+
+def _is_rejected(status: str) -> bool:
+    s = (status or '').upper().strip()
+    return any(x in s for x in ('REJECT','CANCEL','EXPIRED','FAILED','ERROR'))
 
 
 def parse_orderbook_csv(csv_text: str) -> dict:
-    """
-    Parse STOXXO order book CSV text.
-
-    Expected columns (order may vary):
-    Symbol, OrderDateTime, Side (BUY/SELL), TradeQty, TradePrice, Status
-
-    Returns computed session data dict.
-    """
     warnings = []
 
-    # Try to detect delimiter
-    sample = csv_text[:2000]
-    delimiter = ',' if sample.count(',') > sample.count('\t') else '\t'
+    # Strip BOM
+    csv_text = csv_text.lstrip('\ufeff')
 
-    reader = csv.DictReader(io.StringIO(csv_text), delimiter=delimiter)
+    delim = _detect_delimiter(csv_text)
+    reader = csv.DictReader(io.StringIO(csv_text), delimiter=delim)
 
-    # Normalize column names (strip spaces, lowercase)
     rows = []
     for row in reader:
-        normalized = {k.strip().lower().replace(' ', '_'): v.strip() for k, v in row.items()}
-        rows.append(normalized)
+        rows.append(_norm_cols(row))
 
     if not rows:
         return {"error": "No data rows found in CSV"}
 
-    # Column name aliases (STOXXO uses different names)
-    def get_col(row, *names):
-        for n in names:
-            if n in row:
-                return row[n]
-        return None
+    # Diagnose columns for debugging
+    sample_keys = list(rows[0].keys()) if rows else []
 
-    # Aggregate fills per symbol
-    # Structure: {symbol: {buys: [{qty, price}], sells: [{qty, price}]}}
     fills = defaultdict(lambda: {"buys": [], "sells": []})
-
     executed_count = 0
     rejected_count = 0
     total_buy_val  = 0.0
     total_sell_val = 0.0
+    skipped = 0
 
     for row in rows:
-        status = (get_col(row, 'status', 'orderstatus', 'order_status') or '').upper()
+        status_raw = _get(row, STATUS_COLS)
 
-        if 'REJECT' in status or 'CANCEL' in status:
+        if _is_rejected(status_raw):
             rejected_count += 1
             continue
 
-        if 'COMPLETE' not in status and 'TRADED' not in status and 'FILLED' not in status:
-            if status:
-                continue
+        if not _is_executed(status_raw):
+            skipped += 1
+            continue
 
-        symbol = get_col(row, 'symbol', 'tradingsymbol', 'trading_symbol', 'scripname') or ''
-        symbol = symbol.strip().upper()
+        symbol = _get(row, SYMBOL_COLS)
         if not symbol:
             continue
+        symbol = symbol.strip().upper()
 
-        side  = (get_col(row, 'side', 'transactiontype', 'transaction_type', 'buy/sell') or '').upper()
-        qty   = get_col(row, 'tradeqty', 'trade_qty', 'qty', 'filledqty', 'filled_qty', 'quantity')
-        price = get_col(row, 'tradeprice', 'trade_price', 'price', 'averageprice', 'average_price', 'avg_price')
+        side_raw = (_get(row, SIDE_COLS) or '').upper().strip()
+        qty_raw  = _get(row, QTY_COLS)
+        px_raw   = _get(row, PRICE_COLS)
 
         try:
-            qty   = float(str(qty).replace(',', ''))
-            price = float(str(price).replace(',', ''))
+            qty = float(str(qty_raw).replace(',', '').strip())
+            px  = float(str(px_raw).replace(',', '').strip())
         except (ValueError, TypeError):
-            warnings.append(f"Could not parse qty/price for row: {symbol}")
+            warnings.append(f"Cannot parse qty/price for {symbol}: qty={qty_raw} px={px_raw}")
             continue
 
-        if qty <= 0 or price <= 0:
+        if qty <= 0 or px <= 0:
             continue
+
+        is_buy  = any(x in side_raw for x in ('BUY','B','LONG','PURCHASE')) or side_raw == 'B'
+        is_sell = any(x in side_raw for x in ('SELL','S','SHORT','SALE')) or side_raw == 'S'
+
+        if not is_buy and not is_sell:
+            # Last resort: single char
+            if side_raw in ('B',): is_buy = True
+            elif side_raw in ('S',): is_sell = True
+            else:
+                warnings.append(f"Unknown side '{side_raw}' for {symbol}")
+                continue
 
         executed_count += 1
-        value = qty * price
+        value = qty * px
 
-        if 'BUY' in side or 'B' == side:
-            fills[symbol]["buys"].append({"qty": qty, "price": price})
+        if is_buy:
+            fills[symbol]["buys"].append({"qty": qty, "price": px})
             total_buy_val += value
-        elif 'SELL' in side or 'S' == side:
-            fills[symbol]["sells"].append({"qty": qty, "price": price})
-            total_sell_val += value
         else:
-            warnings.append(f"Unknown side '{side}' for {symbol}")
+            fills[symbol]["sells"].append({"qty": qty, "price": px})
+            total_sell_val += value
 
     if not fills:
-        return {"error": "No valid executed trades found. Check CSV format."}
+        col_hint = f"Detected columns: {', '.join(sample_keys[:12])}"
+        return {"error": f"No valid executed trades found. {col_hint}. Check CSV format or column names."}
+
+    if skipped > 0:
+        warnings.append(f"{skipped} rows skipped (pending/open/unknown status)")
 
     total_turnover = total_buy_val + total_sell_val
 
-    # Compute VWAP and P&L per symbol
     strikes = []
     gross_pnl    = 0.0
     total_ce_pnl = 0.0
@@ -145,21 +176,15 @@ def parse_orderbook_csv(csv_text: str) -> dict:
 
         buy_qty   = sum(f["qty"] for f in buys)
         sell_qty  = sum(f["qty"] for f in sells)
-        buy_vwap  = sum(f["qty"] * f["price"] for f in buys) / buy_qty  if buy_qty  else 0
-        sell_vwap = sum(f["qty"] * f["price"] for f in sells) / sell_qty if sell_qty else 0
+        buy_vwap  = sum(f["qty"]*f["price"] for f in buys)  / buy_qty  if buy_qty  else 0
+        sell_vwap = sum(f["qty"]*f["price"] for f in sells) / sell_qty if sell_qty else 0
 
         matched_qty = min(buy_qty, sell_qty)
-
-        if matched_qty > 0:
-            realized = (sell_vwap - buy_vwap) * matched_qty
-        else:
-            realized = 0.0
-
-        open_qty  = abs(buy_qty - sell_qty)
-        open_side = "BUY" if buy_qty > sell_qty else "SELL" if sell_qty > buy_qty else None
+        realized    = (sell_vwap - buy_vwap) * matched_qty if matched_qty > 0 else 0.0
+        open_qty    = abs(buy_qty - sell_qty)
+        open_side   = "BUY" if buy_qty > sell_qty else "SELL" if sell_qty > buy_qty else None
 
         sym_info = parse_symbol(symbol)
-
         strike_data = {
             "symbol":      symbol,
             "index":       sym_info["index"],
@@ -178,21 +203,16 @@ def parse_orderbook_csv(csv_text: str) -> dict:
         }
         strikes.append(strike_data)
         gross_pnl += realized
+        opt = sym_info["option_type"]
+        if opt == "CE": total_ce_pnl += realized
+        elif opt == "PE": total_pe_pnl += realized
 
-        if sym_info["option_type"] == "CE":
-            total_ce_pnl += realized
-        elif sym_info["option_type"] == "PE":
-            total_pe_pnl += realized
-
-    # Compute charges
     charges = compute_charges(total_buy_val, total_sell_val, total_turnover)
     net_pnl = gross_pnl - charges["total"]
 
-    # Detect index (most common)
-    indices = [s["index"] for s in strikes if s["index"]]
+    indices    = [s["index"] for s in strikes if s["index"]]
     index_name = max(set(indices), key=indices.count) if indices else "Unknown"
 
-    # Sort strikes by realized P&L descending
     strikes.sort(key=lambda x: x["realized"], reverse=True)
 
     return {
