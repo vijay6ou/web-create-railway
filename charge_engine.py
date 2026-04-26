@@ -1,69 +1,47 @@
-import os
-import bcrypt
-import jwt
-from datetime import datetime, timedelta
-from fastapi import Depends, HTTPException
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+"""
+Indian Options Regulatory Charge Engine
+Covers: STT, NSE Exchange Fee, SEBI Charges, Stamp Duty, GST
+Post-Budget 2024 rates
+"""
 
-SECRET_KEY       = os.environ.get("SECRET_KEY", "vj-trading-secret-2026-change-me")
-ALGORITHM        = "HS256"
-TOKEN_EXPIRE_DAYS = 7
-bearer_scheme    = HTTPBearer(auto_error=False)
+def compute_charges(
+    total_buy_value: float,
+    total_sell_value: float,
+    total_turnover: float
+) -> dict:
+    """
+    Compute all regulatory charges for Indian options trading.
 
-def _hash(password: str) -> bytes:
-    return bcrypt.hashpw(password.encode(), bcrypt.gensalt())
+    Args:
+        total_buy_value:  Sum of (premium * qty) for all buy orders
+        total_sell_value: Sum of (premium * qty) for all sell orders
+        total_turnover:   total_buy_value + total_sell_value
 
-def _verify(password: str, hashed: bytes) -> bool:
-    return bcrypt.checkpw(password.encode(), hashed)
+    Returns:
+        dict with individual charges and total
+    """
+    # STT: 0.1% on sell side only (options sell)
+    stt = total_sell_value * 0.001
 
-# Passwords hashed at import time — safe, bcrypt is the direct library
-USERS = {
-    "vijay": {
-        "username": "vijay",
-        "pw_hash": _hash(os.environ.get("VIJAY_PASSWORD", "vj@2026")),
-        "role": "admin"
-    },
-    "mentor": {
-        "username": "mentor",
-        "pw_hash": _hash(os.environ.get("MENTOR_PASSWORD", "mentor@2026")),
-        "role": "readonly"
-    },
-    "peer": {
-        "username": "peer",
-        "pw_hash": _hash(os.environ.get("PEER_PASSWORD", "peer@2026")),
-        "role": "readonly"
+    # NSE Exchange Transaction Fee: 0.053% on total turnover
+    exchange = total_turnover * 0.00053
+
+    # SEBI Charges: ₹10 per crore of turnover
+    sebi = (total_turnover / 1_00_00_000) * 10
+
+    # Stamp Duty: 0.003% on buy side only
+    stamp = total_buy_value * 0.00003
+
+    # GST: 18% on (exchange fee + SEBI charges)
+    gst = (exchange + sebi) * 0.18
+
+    total = stt + exchange + sebi + stamp + gst
+
+    return {
+        "stt":      round(stt, 2),
+        "exchange": round(exchange, 2),
+        "sebi":     round(sebi, 2),
+        "stamp":    round(stamp, 2),
+        "gst":      round(gst, 2),
+        "total":    round(total, 2)
     }
-}
-
-def authenticate_user(username: str, password: str):
-    user = USERS.get(username)
-    if not user:
-        return None
-    if not _verify(password, user["pw_hash"]):
-        return None
-    return user
-
-def create_access_token(data: dict) -> str:
-    payload = data.copy()
-    payload["exp"] = datetime.utcnow() + timedelta(days=TOKEN_EXPIRE_DAYS)
-    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
-
-def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme)):
-    if not credentials:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    try:
-        payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
-        username = payload.get("sub")
-        user = USERS.get(username)
-        if not user:
-            raise HTTPException(status_code=401, detail="User not found")
-        return user
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="Token expired")
-    except jwt.InvalidTokenError:
-        raise HTTPException(status_code=401, detail="Invalid token")
-
-def require_admin(user: dict = Depends(get_current_user)):
-    if user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="Admin access required")
-    return user
