@@ -3,648 +3,312 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>VJ Trading Terminal</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<title>VJ Trading Dashboard</title>
+<!-- CDN replacements for local files -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
-:root {
-  --bg:#04070f; --bg2:#080d1a; --surface:#0d1424; --surface2:#111b2e;
-  --surface3:#162036; --border:#1a2840; --border2:#223352;
-  --accent:#00e5ff; --accent2:#7b61ff; --accent3:#ff6b6b;
-  --green:#00e676; --red:#ff5252; --yellow:#ffd740; --orange:#ff9100;
-  --text:#e8edf5; --muted:#4a6080; --muted2:#6a80a0;
-  --font-mono:'JetBrains Mono',monospace;
-  --font-ui:'Space Grotesk',sans-serif;
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@300;400;500;600&display=swap');
+:root{
+  --bg:#07090e;--s1:#0d1117;--s2:#161b22;--s3:#1e2530;--s4:#252d38;
+  --bd:#2a3441;--bd2:#364553;
+  --tx:#c9d1d9;--tx2:#8b949e;--tx3:#495867;
+  --gr:#3fb950;--gr2:rgba(63,185,80,.12);
+  --rd:#f85149;--rd2:rgba(248,81,73,.12);
+  --am:#d29922;--am2:rgba(210,153,34,.12);
+  --bl:#58a6ff;--bl2:rgba(88,166,255,.12);
+  --pr:#bc8cff;--pr2:rgba(188,140,255,.12);
+  --ac:#f78166;
+  --fn:'Inter',sans-serif;--fm:'JetBrains Mono',monospace;
 }
 *{box-sizing:border-box;margin:0;padding:0}
-html{scroll-behavior:smooth}
-body{background:var(--bg);color:var(--text);font-family:var(--font-ui);min-height:100vh;overflow-x:hidden}
-body::before{content:'';position:fixed;inset:0;background:
-  radial-gradient(ellipse 80% 50% at 20% 0%,rgba(0,229,255,.04) 0%,transparent 60%),
-  radial-gradient(ellipse 60% 40% at 80% 100%,rgba(123,97,255,.04) 0%,transparent 60%);
-  pointer-events:none;z-index:0}
-
-/* ── SCROLLBAR ── */
+html,body{height:100%;overflow:hidden}
+body{background:var(--bg);color:var(--tx);font-family:var(--fn);font-size:13px}
 ::-webkit-scrollbar{width:5px;height:5px}
-::-webkit-scrollbar-track{background:var(--bg2)}
-::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:3px}
 
-/* ── LOADING ── */
-#loading{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;
-  align-items:center;justify-content:center;z-index:999;transition:opacity .3s}
-#loading.hidden{opacity:0;pointer-events:none}
-.loader-ring{width:48px;height:48px;border:3px solid var(--border2);border-top-color:var(--accent);
-  border-radius:50%;animation:spin .9s linear infinite;margin-bottom:16px}
-@keyframes spin{to{transform:rotate(360deg)}}
-#load-msg{color:var(--muted2);font-size:13px;font-family:var(--font-mono)}
+/* ── LAYOUT ── */
+#app{display:flex;flex-direction:column;height:100vh}
+#topbar{background:var(--s1);border-bottom:1px solid var(--bd);padding:0 20px;height:52px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+#workspace{display:flex;flex:1;overflow:hidden}
+#sidebar{width:200px;background:var(--s1);border-right:1px solid var(--bd);display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto;padding:8px 0}
+#main{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:14px}
 
-/* ── LOGIN ── */
-#login-screen{display:none;position:fixed;inset:0;background:var(--bg);
-  align-items:center;justify-content:center;z-index:100;padding:24px}
-.login-card{background:var(--surface);border:1px solid var(--border2);border-radius:20px;
-  padding:44px;width:100%;max-width:400px;position:relative;overflow:hidden}
-.login-card::before{content:'';position:absolute;top:-60px;right:-60px;width:180px;height:180px;
-  background:radial-gradient(circle,rgba(0,229,255,.12),transparent 70%);pointer-events:none}
-.login-logo{display:flex;align-items:center;gap:12px;margin-bottom:8px}
-.logo-mark{width:42px;height:42px;background:linear-gradient(135deg,var(--accent),var(--accent2));
-  border-radius:10px;display:flex;align-items:center;justify-content:center;
-  font-family:var(--font-mono);font-weight:700;font-size:16px;color:#000;flex-shrink:0}
-.login-card h1{font-size:20px;font-weight:700;letter-spacing:-.3px}
-.login-card h1 span{color:var(--accent)}
-.login-card p{color:var(--muted2);font-size:13px;margin-bottom:32px;margin-top:4px}
-.field{display:flex;flex-direction:column;gap:6px;margin-bottom:16px}
-.field label{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--muted2);font-family:var(--font-mono)}
-.field input{background:var(--surface2);border:1px solid var(--border2);border-radius:10px;
-  color:var(--text);padding:12px 14px;font-size:14px;font-family:var(--font-ui);outline:none;
-  transition:border-color .2s}
-.field input:focus{border-color:var(--accent)}
-.login-err{color:var(--red);font-size:12px;min-height:18px;font-family:var(--font-mono)}
+/* ── LOGIN OVERLAY ── */
+#login-overlay{position:fixed;inset:0;background:var(--bg);z-index:999;display:flex;align-items:center;justify-content:center}
+.login-box{background:var(--s1);border:1px solid var(--bd2);border-radius:12px;padding:36px;width:360px}
+.login-box h2{font-family:var(--fm);font-size:18px;color:var(--bl);margin-bottom:6px}
+.login-box p{font-size:12px;color:var(--tx3);margin-bottom:24px}
+.lf-row{display:flex;flex-direction:column;gap:5px;margin-bottom:14px}
+.lf-row label{font-size:11px;color:var(--tx2);font-weight:500}
+.lf-row input{background:var(--s3);border:1px solid var(--bd);color:var(--tx);font-size:13px;border-radius:6px;padding:9px 11px;font-family:var(--fn);transition:border-color .15s;width:100%}
+.lf-row input:focus{outline:none;border-color:var(--bl)}
+#login-err{color:var(--rd);font-size:12px;min-height:16px;margin-bottom:8px;font-family:var(--fm)}
 
-/* ── MAIN APP ── */
-#app{display:none;position:relative;z-index:1}
+/* ── TOPBAR ── */
+.tb-left{display:flex;align-items:center;gap:12px}
+.brand{font-family:var(--fm);font-weight:600;font-size:15px;color:var(--bl);letter-spacing:-.5px}
+.tb-badge{background:var(--s3);border:1px solid var(--bd);border-radius:4px;padding:3px 9px;font-family:var(--fm);font-size:10px;color:var(--tx2)}
+.tb-right{display:flex;align-items:center;gap:8px}
+.ldot{width:7px;height:7px;border-radius:50%;background:var(--gr);box-shadow:0 0 6px var(--gr);animation:blink 2s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.tb-vix{background:var(--am2);border:1px solid rgba(210,153,34,.3);color:var(--am);font-family:var(--fm);font-size:11px;padding:3px 10px;border-radius:4px}
+.tb-user{font-family:var(--fm);font-size:11px;color:var(--tx2);padding:3px 8px;background:var(--s3);border:1px solid var(--bd);border-radius:4px}
 
-/* ── HEADER ── */
-.header{background:rgba(8,13,26,.85);backdrop-filter:blur(12px);
-  border-bottom:1px solid var(--border);padding:0 24px;
-  display:flex;align-items:center;justify-content:space-between;
-  position:sticky;top:0;z-index:50;height:56px}
-.h-left{display:flex;align-items:center;gap:14px}
-.h-logo{width:32px;height:32px;background:linear-gradient(135deg,var(--accent),var(--accent2));
-  border-radius:8px;display:flex;align-items:center;justify-content:center;
-  font-family:var(--font-mono);font-weight:800;font-size:12px;color:#000}
-.h-title{font-size:15px;font-weight:700;letter-spacing:-.2px}
-.h-title span{color:var(--accent)}
-.h-pill{background:var(--surface2);border:1px solid var(--border);border-radius:20px;
-  padding:3px 10px;font-size:11px;color:var(--muted2);font-family:var(--font-mono)}
-.h-pill b{color:var(--accent)}
-.h-right{display:flex;align-items:center;gap:8px}
-.role-dot{width:7px;height:7px;border-radius:50%;background:var(--yellow);
-  box-shadow:0 0 6px var(--yellow);flex-shrink:0}
-.role-dot.admin{background:var(--green);box-shadow:0 0 6px var(--green)}
-.h-user{font-size:12px;color:var(--muted2);font-family:var(--font-mono)}
+/* ── SIDEBAR ── */
+.sb-section{font-size:9px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--tx3);padding:10px 14px 4px}
+.sb-item{padding:7px 14px;cursor:pointer;display:flex;align-items:center;gap:9px;color:var(--tx2);font-size:12px;border-left:2px solid transparent;transition:all .15s}
+.sb-item:hover{color:var(--tx);background:var(--s2)}
+.sb-item.active{color:var(--bl);background:rgba(88,166,255,.07);border-left-color:var(--bl)}
+.sb-ico{font-size:13px;width:16px;text-align:center;flex-shrink:0}
+.sb-cnt{margin-left:auto;background:var(--s4);border-radius:10px;font-family:var(--fm);font-size:10px;padding:1px 6px;color:var(--tx3)}
 
-/* ── SIDENAV ── */
-.layout{display:flex;min-height:calc(100vh - 56px)}
-.sidenav{width:220px;flex-shrink:0;background:var(--bg2);border-right:1px solid var(--border);
-  padding:20px 0;position:sticky;top:56px;height:calc(100vh - 56px);overflow-y:auto}
-.nav-section{padding:0 12px;margin-bottom:6px}
-.nav-label{font-size:10px;letter-spacing:1.2px;text-transform:uppercase;
-  color:var(--muted);padding:0 10px;margin-bottom:6px;font-family:var(--font-mono)}
-.nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:9px;
-  cursor:pointer;color:var(--muted2);font-size:13px;font-weight:500;transition:all .15s;
-  margin-bottom:2px;user-select:none}
-.nav-item:hover{background:var(--surface);color:var(--text)}
-.nav-item.active{background:var(--surface2);color:var(--accent);border-left:3px solid var(--accent);
-  padding-left:9px}
-.nav-item .ni{width:18px;text-align:center;font-size:14px;flex-shrink:0}
-.nav-divider{height:1px;background:var(--border);margin:10px 12px}
+/* ── CARDS ── */
+.card{background:var(--s1);border:1px solid var(--bd);border-radius:8px;padding:16px}
+.card-title{font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--tx3);margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.card-badge{font-size:10px;background:var(--s3);border:1px solid var(--bd);border-radius:3px;padding:1px 7px;font-weight:400;text-transform:none;letter-spacing:0;color:var(--tx2)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
 
-/* ── CONTENT ── */
-.main{flex:1;overflow:hidden;min-width:0}
-.page{display:none;padding:24px;animation:fadeIn .2s ease}
-.page.active{display:block}
-@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+/* ── METRIC CARDS ── */
+.mc{background:var(--s2);border:1px solid var(--bd);border-radius:8px;padding:13px 15px}
+.mc-lbl{font-size:9px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--tx3);margin-bottom:6px}
+.mc-val{font-family:var(--fm);font-size:20px;font-weight:600;margin-bottom:3px}
+.mc-sub{font-size:10px;color:var(--tx2)}
+.pos{color:var(--gr)}.neg{color:var(--rd)}.neu{color:var(--am)}
 
-/* ── PAGE HEADER ── */
-.page-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px;flex-wrap:wrap;gap:12px}
-.page-hdr h2{font-size:20px;font-weight:700;letter-spacing:-.3px}
-.page-hdr h2 span{color:var(--accent)}
+/* ── TABLES ── */
+.tbl{width:100%;border-collapse:collapse}
+.tbl th{font-size:10px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--tx3);padding:6px 10px;border-bottom:1px solid var(--bd);text-align:left}
+.tbl td{padding:8px 10px;border-bottom:1px solid rgba(42,52,65,.5);font-size:12px}
+.tbl tbody tr:last-child td{border-bottom:none}
+.tbl tbody tr:hover td{background:var(--s2)}
+.fm{font-family:var(--fm)}
+
+/* ── BADGES ── */
+.badge{display:inline-block;font-size:10px;font-weight:500;padding:2px 8px;border-radius:3px;font-family:var(--fm)}
+.b-gr{background:var(--gr2);color:var(--gr)}.b-rd{background:var(--rd2);color:var(--rd)}
+.b-am{background:var(--am2);color:var(--am)}.b-bl{background:var(--bl2);color:var(--bl)}
+.b-pr{background:var(--pr2);color:var(--pr)}
+
+/* ── INPUTS ── */
+input[type=text],input[type=number],select,textarea{background:var(--s3);border:1px solid var(--bd);color:var(--tx);font-size:12px;border-radius:6px;padding:7px 10px;font-family:var(--fn);transition:border-color .15s;width:100%}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--bl)}
+textarea{resize:vertical;font-family:var(--fm);font-size:11px}
+label{font-size:11px;color:var(--tx2);margin-bottom:4px;display:block;font-weight:500}
+.form-row{display:flex;flex-direction:column;gap:4px}
+.form-grid{display:grid;gap:12px}
 
 /* ── BUTTONS ── */
-.btn{display:inline-flex;align-items:center;gap:7px;padding:9px 18px;border-radius:9px;
-  font-size:13px;font-weight:600;cursor:pointer;border:none;transition:all .15s;
-  font-family:var(--font-ui);white-space:nowrap}
-.btn-primary{background:linear-gradient(135deg,var(--accent),#00b8d9);color:#000}
-.btn-primary:hover{opacity:.88;transform:translateY(-1px)}
-.btn-ghost{background:transparent;border:1px solid var(--border2);color:var(--muted2)}
-.btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
-.btn-danger{background:rgba(255,82,82,.15);border:1px solid rgba(255,82,82,.3);color:var(--red)}
-.btn-danger:hover{background:rgba(255,82,82,.25)}
-.btn-sm{padding:6px 12px;font-size:12px;border-radius:7px}
-.btn:disabled{opacity:.4;cursor:not-allowed;transform:none!important}
-
-/* ── STAT CARDS ── */
-.stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(175px,1fr));gap:14px;margin-bottom:24px}
-.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;
-  padding:18px;position:relative;overflow:hidden;transition:border-color .2s}
-.stat-card:hover{border-color:var(--border2)}
-.stat-card::after{content:'';position:absolute;top:0;left:0;right:0;height:2px;
-  background:linear-gradient(90deg,var(--accent-c,var(--accent)),transparent)}
-.stat-card.green-c{--accent-c:var(--green)}.stat-card.red-c{--accent-c:var(--red)}
-.stat-card.yellow-c{--accent-c:var(--yellow)}.stat-card.purple-c{--accent-c:var(--accent2)}
-.sc-label{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted2);
-  margin-bottom:8px;font-family:var(--font-mono)}
-.sc-value{font-size:22px;font-weight:700;font-family:var(--font-mono);line-height:1}
-.sc-sub{font-size:11px;color:var(--muted);margin-top:5px}
-.green{color:var(--green)}.red{color:var(--red)}.yellow{color:var(--yellow)}
-.accent{color:var(--accent)}.muted{color:var(--muted2)}
+.btn{background:var(--s3);border:1px solid var(--bd2);color:var(--tx);font-size:12px;font-family:var(--fn);font-weight:500;border-radius:6px;padding:7px 14px;cursor:pointer;transition:all .15s}
+.btn:hover{background:var(--s4);border-color:var(--bd)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn-pr{background:rgba(88,166,255,.12);border-color:rgba(88,166,255,.4);color:var(--bl)}
+.btn-gr{background:var(--gr2);border-color:rgba(63,185,80,.4);color:var(--gr)}
+.btn-rd{background:var(--rd2);border-color:rgba(248,81,73,.4);color:var(--rd)}
+.btn-sm{font-size:11px;padding:4px 10px}
+.btn-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 
 /* ── CHARTS ── */
-.chart-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;
-  padding:20px;margin-bottom:20px}
-.chart-title{font-size:12px;letter-spacing:.8px;text-transform:uppercase;
-  color:var(--muted2);margin-bottom:16px;font-family:var(--font-mono);
-  display:flex;align-items:center;gap:8px}
-.chart-title::after{content:'';flex:1;height:1px;background:var(--border)}
+.chart-wrap{position:relative;height:180px}
+.chart-wrap-sm{position:relative;height:140px}
 
-/* ── TABLE ── */
-.tbl-wrap{background:var(--surface);border:1px solid var(--border);border-radius:14px;
-  overflow:hidden;margin-bottom:20px}
-.tbl-wrap table{width:100%;border-collapse:collapse}
-.tbl-wrap thead th{background:var(--surface2);padding:11px 14px;text-align:left;
-  font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);
-  font-family:var(--font-mono);white-space:nowrap}
-.tbl-wrap tbody tr{border-bottom:1px solid var(--border);transition:background .12s;cursor:pointer}
-.tbl-wrap tbody tr:hover{background:var(--surface2)}
-.tbl-wrap tbody tr:last-child{border-bottom:none}
-.tbl-wrap tbody td{padding:11px 14px;font-size:13px;font-family:var(--font-mono)}
+/* ── PROGRESS BARS ── */
+.pbar{height:5px;background:var(--s4);border-radius:3px;overflow:hidden;margin-top:4px}
+.pfill{height:100%;border-radius:3px;transition:width .5s}
 
-/* ── BADGE ── */
-.badge{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;
-  font-size:11px;font-weight:600;font-family:var(--font-mono)}
-.badge-green{background:rgba(0,230,118,.12);color:var(--green);border:1px solid rgba(0,230,118,.2)}
-.badge-red{background:rgba(255,82,82,.12);color:var(--red);border:1px solid rgba(255,82,82,.2)}
-.badge-yellow{background:rgba(255,215,64,.12);color:var(--yellow);border:1px solid rgba(255,215,64,.2)}
-.badge-blue{background:rgba(0,229,255,.1);color:var(--accent);border:1px solid rgba(0,229,255,.2)}
-.badge-purple{background:rgba(123,97,255,.12);color:var(--accent2);border:1px solid rgba(123,97,255,.2)}
+/* ── SCORE RING ── */
+.ring-section{display:flex;align-items:center;gap:20px}
+.ring-wrap{position:relative;width:110px;height:110px;flex-shrink:0}
+.ring-wrap canvas{position:absolute;top:0;left:0}
+.ring-center{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center}
+.ring-val{font-family:var(--fm);font-size:24px;font-weight:600}
+.ring-lbl{font-size:10px;color:var(--tx2)}
+.dims{flex:1;display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.dim{display:flex;flex-direction:column;gap:3px}
+.dim-row{display:flex;justify-content:space-between;font-size:11px;color:var(--tx2)}
 
-/* ── SESSION SELECTOR ── */
-.sess-sel{background:var(--surface);border:1px solid var(--border);border-radius:12px;
-  padding:14px 18px;margin-bottom:20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
-.sess-sel label{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);
-  font-family:var(--font-mono);flex-shrink:0}
-select{background:var(--surface2);border:1px solid var(--border2);border-radius:8px;
-  color:var(--text);padding:8px 12px;font-size:13px;cursor:pointer;outline:none;
-  font-family:var(--font-mono);transition:border-color .2s}
-select:focus{border-color:var(--accent)}
-
-/* ── SCORE BAR ── */
-.score-rows{display:flex;flex-direction:column;gap:10px}
-.score-row{display:flex;align-items:center;gap:12px}
-.score-lbl{width:170px;font-size:12px;color:var(--muted2);flex-shrink:0;font-family:var(--font-mono)}
-.score-bar-bg{flex:1;height:6px;background:var(--surface2);border-radius:4px;overflow:hidden}
-.score-bar-fill{height:100%;border-radius:4px;transition:width .7s cubic-bezier(.4,0,.2,1)}
-.score-num{width:36px;text-align:right;font-size:12px;font-weight:700;font-family:var(--font-mono)}
-
-/* ── FORM ── */
-.form-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:14px}
-.f-group{display:flex;flex-direction:column;gap:6px}
-.f-group label{font-size:10px;letter-spacing:1px;text-transform:uppercase;
-  color:var(--muted2);font-family:var(--font-mono)}
-.f-group input,.f-group select,.f-group textarea{
-  background:var(--surface2);border:1px solid var(--border2);border-radius:9px;
-  color:var(--text);padding:10px 12px;font-size:13px;outline:none;
-  font-family:var(--font-mono);transition:border-color .2s}
-.f-group input:focus,.f-group select:focus,.f-group textarea:focus{border-color:var(--accent)}
-.f-group textarea{resize:vertical;min-height:80px}
-.f-full{grid-column:1/-1}
-
-/* ── MODAL ── */
-.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);
-  z-index:200;align-items:flex-start;justify-content:center;padding:40px 16px;overflow-y:auto}
-.overlay.open{display:flex}
-.modal{background:var(--surface);border:1px solid var(--border2);border-radius:18px;
-  padding:28px;width:100%;max-width:700px;position:relative}
-.modal-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px}
-.modal-hdr h3{font-size:17px;font-weight:700}
-.modal-close{background:var(--surface2);border:1px solid var(--border);border-radius:7px;
-  color:var(--muted2);padding:6px 10px;cursor:pointer;font-size:16px;line-height:1;
-  transition:all .15s}
-.modal-close:hover{color:var(--text);border-color:var(--border2)}
-.modal-actions{display:flex;gap:10px;margin-top:22px;flex-wrap:wrap}
-.modal-err{color:var(--red);font-size:12px;font-family:var(--font-mono);min-height:16px;margin-top:8px}
-
-/* ── LISTS ── */
-.list-item{padding:10px 14px;border-left:3px solid;border-radius:0 9px 9px 0;
-  background:var(--surface2);margin-bottom:8px;font-size:13px;line-height:1.5;
-  transition:background .15s}
-.list-item.viol{border-color:var(--red);background:rgba(255,82,82,.05)}
-.list-item.str{border-color:var(--green);background:rgba(0,230,118,.04)}
+/* ── ALERTS ROW ── */
+.alert-row{display:flex;align-items:flex-start;gap:9px;padding:7px 0;border-bottom:1px solid rgba(42,52,65,.4)}
+.alert-row:last-child{border-bottom:none}
+.adot{width:6px;height:6px;border-radius:50%;flex-shrink:0;margin-top:4px}
 
 /* ── UPLOAD ZONE ── */
-.drop-zone{border:2px dashed var(--border2);border-radius:12px;padding:28px;
-  text-align:center;cursor:pointer;transition:all .2s;position:relative}
-.drop-zone:hover,.drop-zone.drag{border-color:var(--accent);background:rgba(0,229,255,.03)}
-.drop-zone .dz-icon{font-size:28px;margin-bottom:8px;display:block}
-.drop-zone p{color:var(--muted);font-size:13px}
-.drop-zone .dz-name{color:var(--accent);font-family:var(--font-mono);font-size:12px;margin-top:6px}
+#drop-zone{border:2px dashed var(--bd2);border-radius:10px;padding:28px;text-align:center;color:var(--tx2);cursor:pointer;transition:all .2s;background:var(--s2)}
+#drop-zone:hover,#drop-zone.drag{border-color:var(--bl);color:var(--bl);background:rgba(88,166,255,.05)}
+#drop-zone .dz-ico{font-size:32px;margin-bottom:8px;display:block}
+#drop-zone .dz-txt{font-size:13px;font-weight:500;margin-bottom:4px}
+#drop-zone .dz-sub{font-size:11px;color:var(--tx3)}
 
-/* ── INFO BOX ── */
-.info-box{background:var(--surface2);border:1px solid var(--border);border-radius:10px;
-  padding:14px;font-size:13px;line-height:1.7;margin-bottom:14px}
-.info-box.success{border-color:rgba(0,230,118,.3);background:rgba(0,230,118,.05)}
-.info-box.warn{border-color:rgba(255,215,64,.3);background:rgba(255,215,64,.05)}
-.info-box.err{border-color:rgba(255,82,82,.3);background:rgba(255,82,82,.05)}
+/* ── CONFIG STRIP ── */
+#cfg-strip{background:var(--s1);border:1px solid var(--bd);border-radius:8px;padding:12px 16px;display:grid;gap:12px;grid-template-columns:repeat(6,1fr)}
 
-/* ── TABS (sub) ── */
-.sub-tabs{display:flex;gap:4px;margin-bottom:20px;background:var(--surface);
-  border:1px solid var(--border);border-radius:10px;padding:5px}
-.sub-tab{padding:7px 16px;border-radius:7px;cursor:pointer;font-size:13px;font-weight:500;
-  color:var(--muted2);transition:all .15s;white-space:nowrap}
-.sub-tab:hover{color:var(--text)}
-.sub-tab.active{background:var(--surface2);color:var(--accent)}
+/* ── CARRY PANEL ── */
+#carry-panel{background:var(--s1);border:1px solid var(--am);border-radius:8px;padding:14px}
+.carry-row{display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid rgba(42,52,65,.5)}
+.carry-row:last-child{border-bottom:none}
+.carry-sym{font-family:var(--fm);font-size:11px;width:200px;flex-shrink:0}
+.carry-side{width:60px;text-align:center}
+.carry-qty{width:60px;text-align:right;font-family:var(--fm);font-size:11px}
 
-/* ── CHART IMAGE DISPLAY ── */
-.chart-img-wrap{border-radius:12px;overflow:hidden;border:1px solid var(--border);
-  background:var(--surface2);position:relative}
-.chart-img-wrap img{width:100%;display:block;max-height:500px;object-fit:contain}
-.chart-img-toolbar{position:absolute;top:10px;right:10px;display:flex;gap:6px}
+/* ── MODAL ── */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:100;display:flex;align-items:center;justify-content:center}
+.modal{background:var(--s1);border:1px solid var(--bd2);border-radius:10px;padding:22px;width:560px;max-width:95vw;max-height:90vh;overflow-y:auto}
+.modal-title{font-size:15px;font-weight:600;margin-bottom:16px;color:var(--tx)}
+.modal-close{float:right;background:none;border:none;color:var(--tx2);cursor:pointer;font-size:18px;margin-top:-2px}
 
-/* ── JOURNAL ── */
-.journal-view{background:var(--surface2);border:1px solid var(--border);border-radius:12px;
-  padding:18px;font-size:14px;line-height:1.8;white-space:pre-wrap;
-  font-family:var(--font-mono);color:var(--text);min-height:80px}
+/* ── SESSION LIST ITEM ── */
+.sess-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--bd);cursor:pointer;transition:background .12s}
+.sess-item:hover{background:var(--s2)}
+.sess-item.sel{background:rgba(88,166,255,.07);border-left:2px solid var(--bl)}
+.sess-left{flex:1;min-width:0}
+.sess-date{font-family:var(--fm);font-size:11px;color:var(--tx);font-weight:500}
+.sess-idx{font-size:10px;color:var(--tx2)}
+.sess-right{text-align:right}
+.sess-pnl{font-family:var(--fm);font-size:12px;font-weight:600}
+.sess-roi{font-size:10px;color:var(--tx2);font-family:var(--fm)}
 
-/* ── NOTIFY ── */
-#notify{position:fixed;bottom:24px;right:24px;z-index:999;
-  background:var(--surface);border:1px solid var(--border2);border-radius:12px;
-  padding:12px 18px;font-size:13px;font-family:var(--font-mono);
-  transform:translateY(80px);opacity:0;transition:all .3s;max-width:360px}
-#notify.show{transform:none;opacity:1}
-#notify.err{border-color:rgba(255,82,82,.4);color:var(--red)}
-#notify.ok{border-color:rgba(0,230,118,.4);color:var(--green)}
+/* ── TABS ── */
+.tab-row{display:flex;gap:0;border-bottom:1px solid var(--bd);margin-bottom:14px}
+.tab{padding:8px 16px;cursor:pointer;font-size:12px;font-weight:500;color:var(--tx2);border-bottom:2px solid transparent;transition:all .15s;margin-bottom:-1px}
+.tab:hover{color:var(--tx)}
+.tab.active{color:var(--bl);border-bottom-color:var(--bl)}
 
-/* ── SPINNER ── */
-.spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(0,0,0,.3);
-  border-top-color:rgba(0,0,0,.8);border-radius:50%;animation:spin .7s linear infinite}
-.spinner.light{border:2px solid rgba(255,255,255,.2);border-top-color:var(--accent)}
+/* ── TOAST ── */
+#toast-wrap{position:fixed;bottom:20px;right:20px;z-index:200;display:flex;flex-direction:column;gap:8px}
+.toast{background:var(--s3);border:1px solid var(--bd2);border-radius:6px;padding:10px 14px;font-size:12px;color:var(--tx);animation:fadeIn .2s;max-width:320px}
+.toast.ok{border-color:rgba(63,185,80,.5);color:var(--gr)}
+.toast.err{border-color:rgba(248,81,73,.5);color:var(--rd)}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
 
-/* ── SECTION TITLE ── */
-.sec-title{font-size:10px;letter-spacing:1.2px;text-transform:uppercase;
-  color:var(--muted);margin-bottom:14px;font-family:var(--font-mono);
-  display:flex;align-items:center;gap:8px}
-.sec-title::after{content:'';flex:1;height:1px;background:var(--border)}
+/* ── CE/PE SPLIT BAR ── */
+.split-bar{display:flex;height:8px;border-radius:4px;overflow:hidden;margin:8px 0 4px}
 
-/* ── GRID 2 ── */
-.g2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
-.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
-@media(max-width:800px){.g2,.g3{grid-template-columns:1fr}.sidenav{display:none}}
+/* ── HEATMAP ── */
+.hm-row{display:flex;align-items:center;gap:8px;margin-bottom:4px}
+.hm-lbl{width:80px;font-size:10px;color:var(--tx2);font-family:var(--fm);text-align:right;flex-shrink:0}
+.hm-bar{flex:1;height:26px;border-radius:4px;display:flex;align-items:center;padding:0 10px;justify-content:flex-end}
+.hm-val{font-family:var(--fm);font-size:10px;font-weight:500}
 
-/* ── TWO PANEL LAYOUT ── */
-.detail-layout{display:grid;grid-template-columns:1fr 380px;gap:20px;align-items:start}
-@media(max-width:1100px){.detail-layout{grid-template-columns:1fr}}
+/* ── EMPTY STATE ── */
+.empty{text-align:center;padding:40px 20px;color:var(--tx3)}
+.empty-ico{font-size:36px;margin-bottom:10px;display:block}
+.empty-txt{font-size:13px;color:var(--tx2);margin-bottom:6px}
+.empty-sub{font-size:11px}
+
+/* ── CHART IMAGE ── */
+.chart-img-wrap{border:1px solid var(--bd);border-radius:6px;overflow:hidden;background:var(--s3);min-height:80px;display:flex;align-items:center;justify-content:center}
+.chart-img-wrap img{width:100%;max-height:280px;object-fit:contain;display:block}
+
+/* ── PEER ROI ── */
+.peer-row{display:flex;align-items:center;gap:10px;padding:5px 0}
+.peer-bar-wrap{flex:1;height:18px;background:var(--s4);border-radius:3px;overflow:hidden;position:relative}
+.peer-bar-fill{height:100%;border-radius:3px;transition:width .5s}
+.peer-val{font-family:var(--fm);font-size:11px;width:70px;text-align:right}
+
+/* ── CHGROW ── */
+.chg-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid rgba(42,52,65,.4)}
+.chg-row:last-child{border-bottom:none}
+.chg-lbl{font-size:12px;color:var(--tx2)}
+.chg-val{font-family:var(--fm);font-size:12px;font-weight:500}
+
+/* ── JOURNAL / CHART UPLOAD ── */
+.drop-sm{border:2px dashed var(--bd2);border-radius:8px;padding:16px;text-align:center;cursor:pointer;transition:all .2s;background:var(--s2);font-size:12px;color:var(--tx2)}
+.drop-sm:hover{border-color:var(--bl);color:var(--bl)}
 </style>
 </head>
 <body>
 
-<!-- LOADING -->
-<div id="loading">
-  <div class="loader-ring"></div>
-  <div id="load-msg">Connecting to terminal…</div>
-</div>
-
-<!-- LOGIN -->
-<div id="login-screen">
-  <div class="login-card">
-    <div class="login-logo">
-      <div class="logo-mark">VJ</div>
-      <div>
-        <div class="login-card h1" style="font-size:18px;font-weight:700">VJ <span style="color:var(--accent)">Trading</span></div>
-      </div>
-    </div>
-    <p style="color:var(--muted2);font-size:13px;margin-bottom:28px">Options Analytics Terminal · v2.0</p>
-    <div class="field"><label>Username</label><input id="l-user" type="text" placeholder="vijay" autocomplete="username"></div>
-    <div class="field"><label>Password</label><input id="l-pass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
-    <div class="login-err" id="login-err"></div>
-    <button class="btn btn-primary" style="width:100%;margin-top:20px;justify-content:center" onclick="doLogin()">Sign In</button>
+<!-- LOGIN OVERLAY -->
+<div id="login-overlay">
+  <div class="login-box">
+    <h2>VJ / TRADING</h2>
+    <p>Options Analytics Terminal — sign in to continue</p>
+    <div class="lf-row"><label>Username</label><input id="l-user" type="text" placeholder="vijay" autocomplete="username"></div>
+    <div class="lf-row"><label>Password</label><input id="l-pass" type="password" placeholder="••••••••" autocomplete="current-password"></div>
+    <div id="login-err"></div>
+    <button class="btn btn-pr" style="width:100%;justify-content:center;margin-top:4px" onclick="doLogin()">Sign In →</button>
   </div>
 </div>
 
-<!-- APP -->
-<div id="app">
-  <header class="header">
-    <div class="h-left">
-      <div class="h-logo">VJ</div>
-      <span class="h-title">VJ <span>Trading</span></span>
-      <span class="h-pill">Sessions: <b id="hdr-count">0</b></span>
-      <span class="h-pill">Capital: <b id="hdr-capital">—</b></span>
-    </div>
-    <div class="h-right">
-      <div class="role-dot" id="role-dot"></div>
-      <span class="h-user" id="h-user"></span>
-      <button class="btn btn-ghost btn-sm" onclick="doLogout()">Logout</button>
-    </div>
-  </header>
-
-  <div class="layout">
-    <!-- SIDENAV -->
-    <nav class="sidenav">
-      <div class="nav-section">
-        <div class="nav-label">Analytics</div>
-        <div class="nav-item active" onclick="nav('overview',this)"><span class="ni">◈</span>Overview</div>
-        <div class="nav-item" onclick="nav('sessions',this)"><span class="ni">≡</span>All Sessions</div>
-        <div class="nav-item" onclick="nav('detail',this)"><span class="ni">◉</span>Session Detail</div>
-        <div class="nav-item" onclick="nav('scoring',this)"><span class="ni">⬡</span>Scoring</div>
-      </div>
-      <div class="nav-divider"></div>
-      <div class="nav-section">
-        <div class="nav-label">Data Entry</div>
-        <div class="nav-item" id="nav-add" onclick="openAddModal()"><span class="ni">＋</span>New Session</div>
-        <div class="nav-item" onclick="nav('upload',this)"><span class="ni">↑</span>Upload CSV</div>
-        <div class="nav-item" onclick="nav('charts',this)"><span class="ni">▦</span>Charts &amp; Journal</div>
-      </div>
-      <div class="nav-divider"></div>
-      <div class="nav-section">
-        <div class="nav-label">System</div>
-        <div class="nav-item" onclick="nav('settings',this)"><span class="ni">⚙</span>Settings</div>
-      </div>
-    </nav>
-
-    <!-- MAIN CONTENT -->
-    <main class="main">
-
-      <!-- ═══ OVERVIEW ═══ -->
-      <div id="page-overview" class="page active">
-        <div class="page-hdr">
-          <h2>Portfolio <span>Overview</span></h2>
-          <div style="display:flex;gap:8px">
-            <button class="btn btn-ghost btn-sm" onclick="loadSessions();notify('Refreshed','ok')">↻ Refresh</button>
-          </div>
-        </div>
-        <div class="stat-grid" id="ov-cards"></div>
-        <div class="g2">
-          <div class="chart-card">
-            <div class="chart-title">Cumulative Net P&amp;L</div>
-            <canvas id="equity-chart"></canvas>
-          </div>
-          <div class="chart-card">
-            <div class="chart-title">Session Score Tracker</div>
-            <canvas id="score-chart"></canvas>
-          </div>
-        </div>
-        <div class="chart-card">
-          <div class="chart-title">CE vs PE P&amp;L by Session</div>
-          <canvas id="cepe-chart"></canvas>
-        </div>
-      </div>
-
-      <!-- ═══ ALL SESSIONS ═══ -->
-      <div id="page-sessions" class="page">
-        <div class="page-hdr">
-          <h2>All <span>Sessions</span></h2>
-          <div style="display:flex;gap:8px">
-            <input id="sess-search" type="text" placeholder="Search…"
-              style="background:var(--surface);border:1px solid var(--border);border-radius:8px;
-              color:var(--text);padding:8px 12px;font-size:13px;outline:none;width:180px"
-              oninput="renderSessionsTable()">
-          </div>
-        </div>
-        <div class="tbl-wrap">
-          <table>
-            <thead><tr>
-              <th>Date</th><th>Index</th><th>VIX</th><th>Capital</th>
-              <th>Gross P&amp;L</th><th>Net P&amp;L</th><th>ROI</th>
-              <th>Charges</th><th>Score</th><th>Actions</th>
-            </tr></thead>
-            <tbody id="sess-tbody"></tbody>
-          </table>
-        </div>
-      </div>
-
-      <!-- ═══ SESSION DETAIL ═══ -->
-      <div id="page-detail" class="page">
-        <div class="page-hdr">
-          <h2>Session <span>Detail</span></h2>
-          <div style="display:flex;align-items:center;gap:8px">
-            <select id="detail-sel" onchange="renderDetail()" style="min-width:200px"></select>
-            <button class="btn btn-ghost btn-sm" id="edit-btn" onclick="openEditModal()">✎ Edit</button>
-            <button class="btn btn-ghost btn-sm" id="ai-btn" onclick="generateAI()">✦ AI Commentary</button>
-          </div>
-        </div>
-        <div class="sub-tabs">
-          <div class="sub-tab active" onclick="subTab('dt-summary',this)">Summary</div>
-          <div class="sub-tab" onclick="subTab('dt-strikes',this)">Strikes</div>
-          <div class="sub-tab" onclick="subTab('dt-chart',this)">Chart</div>
-          <div class="sub-tab" onclick="subTab('dt-journal',this)">Journal</div>
-          <div class="sub-tab" onclick="subTab('dt-ai',this)">AI Commentary</div>
-        </div>
-        <div id="dt-summary"></div>
-        <div id="dt-strikes" style="display:none"></div>
-        <div id="dt-chart" style="display:none"></div>
-        <div id="dt-journal" style="display:none"></div>
-        <div id="dt-ai" style="display:none"></div>
-      </div>
-
-      <!-- ═══ SCORING ═══ -->
-      <div id="page-scoring" class="page">
-        <div class="page-hdr">
-          <h2>Performance <span>Scoring</span></h2>
-          <select id="scoring-sel" onchange="renderScoring()" style="min-width:200px"></select>
-        </div>
-        <div id="scoring-content"></div>
-      </div>
-
-      <!-- ═══ UPLOAD CSV ═══ -->
-      <div id="page-upload" class="page">
-        <div class="page-hdr"><h2>Upload <span>Order Book CSV</span></h2></div>
-        <div class="info-box warn">
-          <b>Supported formats:</b> STOXXO, Jainam XTS, Zerodha, and most Indian broker CSVs.
-          The parser auto-detects columns for Symbol, Side (BUY/SELL), Qty, Price, and Status.
-          If parsing fails, the error message will show detected column names to help debug.
-        </div>
-        <div class="g2" style="align-items:start">
-          <div>
-            <div class="sec-title">Select Session</div>
-            <div class="sess-sel" style="margin-bottom:14px">
-              <label>Session</label>
-              <select id="up-sess" style="flex:1"></select>
-            </div>
-            <div class="f-group" style="margin-bottom:14px">
-              <label>Capital (₹) — optional override</label>
-              <input type="number" id="up-capital" placeholder="e.g. 20000000">
-            </div>
-            <div class="drop-zone" id="up-zone"
-              onclick="document.getElementById('csv-inp').click()"
-              ondragover="event.preventDefault();this.classList.add('drag')"
-              ondragleave="this.classList.remove('drag')"
-              ondrop="handleDrop(event)">
-              <span class="dz-icon">📂</span>
-              <p>Click to select or drag &amp; drop your CSV file</p>
-              <div class="dz-name" id="up-fname"></div>
-            </div>
-            <input type="file" id="csv-inp" accept=".csv,.txt" style="display:none" onchange="handleFileSelect(this)">
-            <div style="margin-top:14px">
-              <button class="btn btn-primary" id="up-btn" onclick="uploadCSV()" disabled>↑ Parse &amp; Upload</button>
-            </div>
-          </div>
-          <div>
-            <div id="up-result"></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- ═══ CHARTS & JOURNAL ═══ -->
-      <div id="page-charts" class="page">
-        <div class="page-hdr">
-          <h2>Charts &amp; <span>Journal</span></h2>
-          <select id="cj-sess" onchange="renderChartsPage()" style="min-width:200px"></select>
-        </div>
-        <div class="g2" style="align-items:start">
-          <div>
-            <div class="sec-title">Day Chart</div>
-            <div id="cj-chart-area"></div>
-            <div class="drop-zone" id="cj-drop"
-              onclick="document.getElementById('chart-inp').click()"
-              ondragover="event.preventDefault();this.classList.add('drag')"
-              ondragleave="this.classList.remove('drag')"
-              ondrop="handleChartDrop(event)">
-              <span class="dz-icon">🖼</span>
-              <p>Click or drag to upload chart image (JPG/PNG, max 10MB)</p>
-              <div class="dz-name" id="cj-fname"></div>
-            </div>
-            <input type="file" id="chart-inp" accept="image/*" style="display:none" onchange="handleChartSelect(this)">
-            <div style="margin-top:12px;display:flex;gap:8px">
-              <button class="btn btn-primary btn-sm" id="cj-upload-btn" onclick="uploadChart()" disabled>Upload Chart</button>
-              <button class="btn btn-danger btn-sm" id="cj-del-btn" onclick="deleteChart()" style="display:none">Delete Chart</button>
-            </div>
-          </div>
-          <div>
-            <div class="sec-title">Trade Journal</div>
-            <div id="cj-journal-area"></div>
-            <div class="f-group" style="margin-bottom:12px">
-              <label>Edit Journal</label>
-              <textarea id="cj-journal-edit" rows="10" placeholder="Pre-market plan, trade rationale, post-session notes…"></textarea>
-            </div>
-            <button class="btn btn-primary btn-sm" onclick="saveJournal()">Save Journal</button>
-          </div>
-        </div>
-      </div>
-
-      <!-- ═══ SETTINGS ═══ -->
-      <div id="page-settings" class="page">
-        <div class="page-hdr"><h2>Settings &amp; <span>Info</span></h2></div>
-        <div class="info-box">
-          <b>VJ Trading Terminal v2.0</b><br>
-          Deployed on Railway · FastAPI backend · SQLite / PostgreSQL storage<br>
-          AI commentary powered by Claude Haiku
-        </div>
-        <div class="info-box">
-          <b>Charge Engine Rates (Post-Budget 2024)</b><br>
-          STT: 0.1% on sell value · Exchange: 0.053% on turnover<br>
-          SEBI: ₹10/Cr · Stamp: 0.003% on buy value · GST: 18% on (exchange+SEBI)
-        </div>
-        <div class="info-box warn" id="vpn-note">
-          <b>⚠ VPN / Cloudflare Access:</b> If the app requires VPN or Cloudflare Tunnel to access,
-          consider adding a public Railway domain or reviewing your Railway service networking settings.
-        </div>
-      </div>
-
-    </main>
+<div id="app" style="display:none">
+<!-- TOP BAR -->
+<div id="topbar">
+  <div class="tb-left">
+    <div class="brand">VJ / TRADING</div>
+    <div class="tb-badge" id="tb-sess">No session selected</div>
+    <div class="tb-badge" id="tb-capital" style="display:none"></div>
+  </div>
+  <div class="tb-right">
+    <div class="tb-vix" id="tb-vix">VIX —</div>
+    <button class="btn btn-sm" onclick="openAddModal()">+ Add Session</button>
+    <button class="btn btn-sm btn-pr" onclick="setView('upload')">📂 Upload CSV</button>
+    <div class="tb-user" id="tb-user"></div>
+    <button class="btn btn-sm btn-rd" onclick="doLogout()">Logout</button>
+    <div class="ldot"></div>
   </div>
 </div>
 
-<!-- ═══ ADD / EDIT SESSION MODAL ═══ -->
-<div class="overlay" id="sess-modal">
+<!-- WORKSPACE -->
+<div id="workspace">
+  <div id="sidebar">
+    <div class="sb-section">Analyse</div>
+    <div class="sb-item active" id="nav-upload" onclick="setView('upload')"><span class="sb-ico">⬆</span>Upload CSV</div>
+    <div class="sb-item" id="nav-overview" onclick="setView('overview')"><span class="sb-ico">▦</span>Overview</div>
+    <div class="sb-item" id="nav-strikes" onclick="setView('strikes')"><span class="sb-ico">⊞</span>Strike P&L</div>
+    <div class="sb-item" id="nav-scoring" onclick="setView('scoring')"><span class="sb-ico">◎</span>Scoring</div>
+    <div class="sb-item" id="nav-charges" onclick="setView('charges')"><span class="sb-ico">₹</span>Charges</div>
+    <div class="sb-item" id="nav-journal" onclick="setView('journal')"><span class="sb-ico">📝</span>Journal</div>
+    <div class="sb-section">History</div>
+    <div class="sb-item" id="nav-sessions" onclick="setView('sessions')"><span class="sb-ico">⋮⋮</span>Sessions<span class="sb-cnt" id="sess-count">0</span></div>
+    <div class="sb-item" id="nav-trends" onclick="setView('trends')"><span class="sb-ico">↗</span>Trends</div>
+    <div class="sb-section">Config</div>
+    <div class="sb-item" id="nav-rules" onclick="setView('rules')"><span class="sb-ico">✦</span>Rules</div>
+  </div>
+
+  <div id="main">
+    <div class="card"><div class="card-title">Loading…</div></div>
+  </div>
+</div>
+</div>
+
+<!-- ADD/EDIT MODAL -->
+<div class="modal-bg" id="modal-bg" style="display:none" onclick="if(event.target===this)closeModal()">
   <div class="modal">
-    <div class="modal-hdr">
-      <h3 id="modal-title">New Session</h3>
-      <button class="modal-close" onclick="closeSessModal()">✕</button>
-    </div>
-    <div class="form-grid">
-      <div class="f-group"><label>Date</label><input type="date" id="f-date"></div>
-      <div class="f-group"><label>Index</label>
-        <select id="f-index"><option>Nifty</option><option>BankNifty</option><option>Sensex</option><option>FinNifty</option><option>MidcpNifty</option></select>
-      </div>
-      <div class="f-group"><label>India VIX</label><input type="number" id="f-vix" placeholder="18.50" step="0.01"></div>
-      <div class="f-group"><label>Capital (₹)</label><input type="number" id="f-capital" placeholder="20000000"></div>
-      <div class="f-group"><label>Gross P&amp;L (₹)</label><input type="number" id="f-gross" placeholder="124423"></div>
-      <div class="f-group"><label>Total Charges (₹)</label><input type="number" id="f-charges" placeholder="4863"></div>
-      <div class="f-group"><label>CE P&amp;L (₹)</label><input type="number" id="f-ce" placeholder="80423"></div>
-      <div class="f-group"><label>PE P&amp;L (₹)</label><input type="number" id="f-pe" placeholder="44000"></div>
-      <div class="f-group"><label>Executed Orders</label><input type="number" id="f-executed" placeholder="151"></div>
-      <div class="f-group"><label>Rejected Orders</label><input type="number" id="f-rejected" placeholder="0"></div>
-      <div class="f-group"><label>Market Toughness (1–10)</label><input type="number" id="f-mt" placeholder="6.85" step="0.01"></div>
-      <div class="f-group"><label>Overall Score (0–100)</label><input type="number" id="f-score" placeholder="71"></div>
-      <div class="f-group"><label>Discipline (0–100)</label><input type="number" id="f-disc" placeholder="70"></div>
-      <div class="f-group"><label>Capital Efficiency (0–100)</label><input type="number" id="f-capeff" placeholder="80"></div>
-      <div class="f-group"><label>Trade Quality (0–100)</label><input type="number" id="f-trq" placeholder="65"></div>
-      <div class="f-group"><label>Market Alignment (0–100)</label><input type="number" id="f-mka" placeholder="55"></div>
-      <div class="f-group"><label>Volatility Handling (0–100)</label><input type="number" id="f-volh" placeholder="68"></div>
-      <div class="f-group"><label>Peer Comparison (0–100)</label><input type="number" id="f-peer" placeholder="92"></div>
-      <div class="f-group"><label>Carry Legs Out</label><input type="number" id="f-carry" placeholder="0" value="0"></div>
-      <div class="f-group"><label>Short Note</label><input type="text" id="f-note" placeholder="Brief summary…"></div>
-    </div>
-    <div style="margin-top:14px" class="f-group">
-      <label>Violations (one per line)</label>
-      <textarea id="f-violations" rows="3"></textarea>
-    </div>
-    <div style="margin-top:10px" class="f-group">
-      <label>Strengths (one per line)</label>
-      <textarea id="f-strengths" rows="3"></textarea>
-    </div>
-    <div class="modal-actions">
-      <button class="btn btn-primary" onclick="saveSession()">💾 Save Session</button>
-      <button class="btn btn-ghost" onclick="closeSessModal()">Cancel</button>
-      <button class="btn btn-danger" id="del-btn" style="margin-left:auto;display:none" onclick="deleteSession()">🗑 Delete</button>
-    </div>
-    <div class="modal-err" id="modal-err"></div>
+    <div class="modal-title" id="modal-title">Add Session<button class="modal-close" onclick="closeModal()">✕</button></div>
+    <div id="modal-body"></div>
   </div>
 </div>
 
-<div id="notify"></div>
+<div id="toast-wrap"></div>
 
 <script>
-// ══════════════════════════════════════════════════
-//  STATE
-// ══════════════════════════════════════════════════
-const API = '';
+// ══════════════════════════════════════════════════════════════
+//  API LAYER (replaces localStorage)
+// ══════════════════════════════════════════════════════════════
 const TOKEN_KEY = 'vj_token';
 const ROLE_KEY  = 'vj_role';
 const USER_KEY  = 'vj_user';
 
-let sessions = [];
-let userRole = '';
-let csvFile  = null;
-let chartFile = null;
-let editingId = null;  // null = new, string = editing existing
+let SESSIONS = [];
+let CUR = null;
+let CHARTS = {};
+let CUR_VIEW = 'upload';
+let USER_ROLE = 'readonly';
 
-// ══════════════════════════════════════════════════
-//  HELPERS
-// ══════════════════════════════════════════════════
+// RAW CSV state
+let RAW = { trades:[], agg:{}, carry:{}, metrics:null, chartFile:null };
+
 const getToken = () => localStorage.getItem(TOKEN_KEY);
 
-function fmtCr(v) {
-  if (v == null) return '—';
-  const abs = Math.abs(v);
-  const sign = v < 0 ? '-' : '';
-  if (abs >= 1e7) return sign + '₹' + (abs/1e7).toFixed(2) + 'Cr';
-  if (abs >= 1e5) return sign + '₹' + (abs/1e5).toFixed(2) + 'L';
-  return sign + '₹' + abs.toLocaleString('en-IN');
-}
-function fmtPnl(v) {
-  if (v == null) return '<span class="muted">—</span>';
-  return `<span class="${v>=0?'green':'red'}">${fmtCr(v)}</span>`;
-}
-function fmtRoi(v, digits=3) {
-  if (v == null) return '<span class="muted">—</span>';
-  return `<span class="${v>=0?'green':'red'}">${v>=0?'+':''}${v.toFixed(digits)}%</span>`;
-}
-function scoreClr(s) {
-  return s >= 75 ? 'var(--green)' : s >= 55 ? 'var(--yellow)' : 'var(--red)';
-}
-function scoreLabel(s) {
-  return s >= 75 ? '🟢 Good' : s >= 55 ? '🟡 Average' : '🔴 Below Par';
-}
-
-let _nid = 0;
-function notify(msg, type='ok') {
-  const el = document.getElementById('notify');
-  el.textContent = msg;
-  el.className = `show ${type}`;
-  clearTimeout(el._t);
-  el._t = setTimeout(() => el.className = '', 3000);
-}
-
-// ══════════════════════════════════════════════════
-//  API
-// ══════════════════════════════════════════════════
 async function apiFetch(path, opts={}) {
   const token = getToken();
   const headers = { ...opts.headers };
   if (token) headers['Authorization'] = `Bearer ${token}`;
   if (!(opts.body instanceof FormData)) headers['Content-Type'] = 'application/json';
-
-  const res = await fetch(API + path, { ...opts, headers });
+  const res = await fetch(path, { ...opts, headers });
   if (res.status === 401) { doLogout(); return null; }
   if (!res.ok) {
     const e = await res.json().catch(() => ({ detail: res.statusText }));
@@ -653,14 +317,76 @@ async function apiFetch(path, opts={}) {
   return res.json();
 }
 
-// ══════════════════════════════════════════════════
-//  AUTH
-// ══════════════════════════════════════════════════
+async function loadSessions() {
+  const data = await apiFetch('/sessions');
+  if (!data) return;
+  // Normalize API response to match dashboard's field names
+  SESSIONS = data.map(s => ({
+    ...s,
+    index: s.index || s.index_name,
+    peer_rois: s.peer_rois || [],
+    scores: s.scores || {overall:0,discipline:0,cap_eff:0,trade_q:0,mkt_align:0,vol_handle:0,peer_cmp:0},
+    violations: s.violations || [],
+    strengths: s.strengths || [],
+    positions: s.strikes ? s.strikes.map(st => ({
+      sym: st.symbol, strike: `${st.strike}${st.option_type}`,
+      side: st.sell_qty > st.buy_qty ? 'SHORT' : 'LONG',
+      entry: st.sell_qty > st.buy_qty ? st.sell_vwap : st.buy_vwap,
+      exit:  st.sell_qty > st.buy_qty ? st.buy_vwap  : st.sell_vwap,
+      qty: Math.max(st.buy_qty, st.sell_qty),
+      pnl: st.realized,
+      open: st.is_carry
+    })) : (s.positions || []),
+    time_pnl: s.time_pnl || {},
+    carry_out: s.carry_out || 0,
+    dte: s.dte || 0,
+    chart_img: s.chart_image || null,
+    charges_breakdown: s.charges_breakdown || {},
+  }));
+  SESSIONS.sort((a,b) => b.id.localeCompare(a.id));
+  updateSessCount();
+}
+
+async function saveSession(sess) {
+  // Map dashboard fields to API schema
+  const body = {
+    id: sess.id,
+    date: sess.date,
+    full: sess.full,
+    index_name: sess.index || sess.index_name || 'Nifty',
+    dte: sess.dte || 0,
+    vix: sess.vix || null,
+    capital: sess.capital || null,
+    gross_pnl: sess.gross_pnl || null,
+    net_pnl: sess.net_pnl || null,
+    net_roi: sess.net_roi || null,
+    gross_roi: sess.gross_roi || null,
+    ce_pnl: sess.ce_pnl || null,
+    pe_pnl: sess.pe_pnl || null,
+    charges: sess.charges || null,
+    executed: sess.executed || null,
+    rejected: sess.rejected || null,
+    mt: sess.mt || null,
+    carry_out: sess.carry_out || 0,
+    note: sess.notes || sess.note || null,
+    journal: sess.journal || null,
+    peer_rois: sess.peer_rois || [],
+    scores: sess.scores || {overall:0,discipline:0,cap_eff:0,trade_q:0,mkt_align:0,vol_handle:0,peer_cmp:0},
+    violations: sess.violations || [],
+    strengths: sess.strengths || [],
+  };
+  return apiFetch('/sessions', { method:'POST', body: JSON.stringify(body) });
+}
+
+async function deleteSessionAPI(id) {
+  return apiFetch(`/sessions/${id}`, { method:'DELETE' });
+}
+
+// ── AUTH ─────────────────────────────────────────────────────
 async function doLogin() {
   const username = document.getElementById('l-user').value.trim();
   const password = document.getElementById('l-pass').value;
-  const errEl = document.getElementById('login-err');
-  errEl.textContent = '';
+  document.getElementById('login-err').textContent = '';
   try {
     const data = await apiFetch('/auth/token', { method:'POST', body:JSON.stringify({username,password}) });
     if (!data) return;
@@ -668,10 +394,10 @@ async function doLogin() {
     const me = await apiFetch('/auth/me');
     localStorage.setItem(ROLE_KEY, me.role);
     localStorage.setItem(USER_KEY, me.username);
-    userRole = me.role;
+    USER_ROLE = me.role;
     await bootApp();
   } catch(e) {
-    errEl.textContent = e.message || 'Login failed';
+    document.getElementById('login-err').textContent = e.message || 'Login failed';
   }
 }
 document.getElementById('l-pass').addEventListener('keydown', e => { if(e.key==='Enter') doLogin(); });
@@ -681,872 +407,1077 @@ function doLogout() {
   localStorage.removeItem(ROLE_KEY);
   localStorage.removeItem(USER_KEY);
   document.getElementById('app').style.display = 'none';
-  document.getElementById('login-screen').style.display = 'flex';
-  document.getElementById('loading').classList.add('hidden');
+  document.getElementById('login-overlay').style.display = 'flex';
 }
 
-// ══════════════════════════════════════════════════
-//  BOOT
-// ══════════════════════════════════════════════════
 async function bootApp() {
-  document.getElementById('login-screen').style.display = 'none';
-  document.getElementById('loading').classList.remove('hidden');
+  document.getElementById('login-overlay').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  USER_ROLE = localStorage.getItem(ROLE_KEY) || 'readonly';
+  const username = localStorage.getItem(USER_KEY) || '';
+  document.getElementById('tb-user').textContent = `${username} [${USER_ROLE}]`;
+  // Show/hide admin-only controls
+  const adminOnly = USER_ROLE === 'admin';
+  document.querySelectorAll('.admin-only').forEach(el => el.style.display = adminOnly ? '' : 'none');
 
-  try {
-    await loadSessions();
-    userRole = localStorage.getItem(ROLE_KEY) || 'readonly';
-    const username = localStorage.getItem(USER_KEY) || '';
-    document.getElementById('h-user').textContent = username;
-    const rd = document.getElementById('role-dot');
-    rd.className = 'role-dot' + (userRole==='admin'?' admin':'');
-    // Hide add/edit for readonly
-    document.getElementById('nav-add').style.opacity = userRole==='admin'?'1':'0.4';
-    document.getElementById('nav-add').style.pointerEvents = userRole==='admin'?'':'none';
-
-    renderOverview();
-    document.getElementById('loading').classList.add('hidden');
-    document.getElementById('app').style.display = 'block';
-  } catch(e) {
-    document.getElementById('load-msg').textContent = 'Connection failed: ' + e.message;
-  }
-}
-
-async function loadSessions() {
-  sessions = await apiFetch('/sessions') || [];
-  populateSelects();
-  const last = sessions[sessions.length-1];
-  document.getElementById('hdr-count').textContent = sessions.length;
-  document.getElementById('hdr-capital').textContent = last?.capital ? fmtCr(last.capital).replace('₹','') : '—';
+  await loadSessions();
+  if (SESSIONS.length) CUR = SESSIONS[0];
+  renderView();
 }
 
 window.addEventListener('load', async () => {
   if (getToken()) {
-    await bootApp();
-    if (document.getElementById('app').style.display === 'none') {
-      document.getElementById('loading').classList.add('hidden');
-      document.getElementById('login-screen').style.display = 'flex';
+    try { await bootApp(); }
+    catch(e) {
+      localStorage.removeItem(TOKEN_KEY);
+      document.getElementById('login-overlay').style.display = 'flex';
     }
-  } else {
-    document.getElementById('loading').classList.add('hidden');
-    document.getElementById('login-screen').style.display = 'flex';
   }
 });
 
-// ══════════════════════════════════════════════════
-//  NAV
-// ══════════════════════════════════════════════════
-function nav(page, el) {
-  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-  if(el) el.classList.add('active');
-  document.getElementById('page-'+page).classList.add('active');
-  if(page==='overview')  renderOverview();
-  if(page==='sessions')  renderSessionsTable();
-  if(page==='detail')    renderDetail();
-  if(page==='scoring')   renderScoring();
-  if(page==='upload')    renderUploadTab();
-  if(page==='charts')    renderChartsPage();
+// ── UPSERT LOCAL CACHE ────────────────────────────────────────
+function upsertLocal(sess) {
+  const idx = SESSIONS.findIndex(s => s.id === sess.id);
+  if (idx >= 0) SESSIONS[idx] = sess;
+  else SESSIONS.unshift(sess);
+  SESSIONS.sort((a,b) => b.id.localeCompare(a.id));
+  CUR = SESSIONS.find(s => s.id === sess.id);
+  updateSessCount();
 }
 
-function subTab(id, el) {
-  const tabs = ['dt-summary','dt-strikes','dt-chart','dt-journal','dt-ai'];
-  tabs.forEach(t => document.getElementById(t).style.display = t===id?'block':'none');
-  document.querySelectorAll('.sub-tab').forEach(t => t.classList.remove('active'));
-  if(el) el.classList.add('active');
+function updateSessCount() {
+  document.getElementById('sess-count').textContent = SESSIONS.length;
 }
 
-// ══════════════════════════════════════════════════
-//  SELECTS
-// ══════════════════════════════════════════════════
-function populateSelects() {
-  const opts = sessions.map(s =>
-    `<option value="${s.id}">${s.full||s.date} — ${s.index||s.index_name}</option>`
-  ).join('');
-  ['detail-sel','scoring-sel','cj-sess'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) { el.innerHTML = opts; }
+async function deleteSession(id) {
+  if (!confirm('Delete this session? Cannot be undone.')) return;
+  try {
+    await deleteSessionAPI(id);
+    SESSIONS = SESSIONS.filter(s => s.id !== id);
+    if (CUR && CUR.id === id) CUR = SESSIONS[0] || null;
+    updateSessCount();
+    renderView();
+    toast('Session deleted', 'ok');
+  } catch(e) { toast(e.message, 'err'); }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  ROUTING
+// ══════════════════════════════════════════════════════════════
+const VIEWS = ['upload','overview','strikes','scoring','charges','journal','sessions','trends','rules'];
+
+function setView(v) {
+  if (!VIEWS.includes(v)) return;
+  CUR_VIEW = v;
+  VIEWS.forEach(n => {
+    const el = document.getElementById('nav-'+n);
+    if (el) el.classList.toggle('active', n === v);
   });
-  const up = document.getElementById('up-sess');
-  if (up) up.innerHTML = opts;
-  const lastId = sessions.length ? sessions[sessions.length-1].id : '';
-  if (lastId) {
-    ['detail-sel','scoring-sel','cj-sess'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.value = lastId;
-    });
-  }
+  renderView();
 }
 
-// ══════════════════════════════════════════════════
-//  OVERVIEW
-// ══════════════════════════════════════════════════
-function renderOverview() {
-  const valid = sessions.filter(s => s.net_pnl != null);
-  const totalNet  = valid.reduce((a,b) => a+b.net_pnl, 0);
-  const totalGross= valid.reduce((a,b) => a+b.gross_pnl, 0);
-  const wins      = valid.filter(s => s.net_pnl > 0).length;
-  const avgScore  = sessions.length ? sessions.reduce((a,b) => a+(b.scores?.overall||0),0)/sessions.length : 0;
-  const bestS     = valid.length ? valid.reduce((a,b) => a.net_pnl>b.net_pnl?a:b) : null;
-  const totalChg  = valid.reduce((a,b) => a+(b.charges||0), 0);
-  const chargeRatio = totalGross > 0 ? (totalChg/totalGross*100) : 0;
+function renderView() {
+  destroyCharts();
+  const fn = {
+    upload:vUpload, overview:vOverview, strikes:vStrikes,
+    scoring:vScoring, charges:vCharges, journal:vJournal,
+    sessions:vSessions, trends:vTrends, rules:vRules
+  }[CUR_VIEW];
+  document.getElementById('main').innerHTML = fn ? fn() : '<div class="empty"><span class="empty-ico">🚧</span><div class="empty-txt">Coming soon</div></div>';
+  afterRender();
+}
 
-  document.getElementById('ov-cards').innerHTML = `
-    <div class="stat-card ${totalNet>=0?'green-c':'red-c'}">
-      <div class="sc-label">Total Net P&L</div>
-      <div class="sc-value ${totalNet>=0?'green':'red'}">${fmtCr(totalNet)}</div>
-      <div class="sc-sub">${valid.length} sessions with data</div>
+function destroyCharts() {
+  Object.values(CHARTS).forEach(c => { try { c.destroy(); } catch(e) {} });
+  CHARTS = {};
+}
+
+function afterRender() {
+  updateTopbar();
+  if (CUR_VIEW === 'overview') buildOverviewCharts();
+  if (CUR_VIEW === 'scoring')  buildScoringCharts();
+  if (CUR_VIEW === 'trends')   buildTrendCharts();
+  if (CUR_VIEW === 'journal')  bindJournalEvents();
+}
+
+function updateTopbar() {
+  const s = CUR;
+  document.getElementById('tb-sess').textContent = s ? `${s.full} · ${s.index} · DTE=${s.dte}` : 'No session selected';
+  document.getElementById('tb-vix').textContent = s ? `VIX ${s.vix}` : 'VIX —';
+  const cap = document.getElementById('tb-capital');
+  if (s) { cap.style.display=''; cap.textContent = `₹${fmtCr(s.capital)}`; }
+  else cap.style.display = 'none';
+}
+
+// ══════════════════════════════════════════════════════════════
+//  UPLOAD VIEW
+// ══════════════════════════════════════════════════════════════
+function vUpload() {
+  const hasData = RAW.trades.length > 0;
+  return `
+    <div class="card">
+      <div class="card-title">Upload Order Book CSV</div>
+      <div id="drop-zone" onclick="document.getElementById('csv-inp').click()"
+           ondragover="event.preventDefault();this.classList.add('drag')"
+           ondragleave="this.classList.remove('drag')"
+           ondrop="handleDrop(event)">
+        <span class="dz-ico">📄</span>
+        <div class="dz-txt">Drop broker CSV here or click to browse</div>
+        <div class="dz-sub">Supports: Zerodha, XTS/STOXXO, Jainam, Upstox order book formats</div>
+        <input type="file" id="csv-inp" accept=".csv" style="display:none" onchange="handleFileInput(this)">
+      </div>
+      ${!hasData ? `<div style="margin-top:10px;text-align:center"><button class="btn btn-sm" onclick="loadSampleCSV()">Load sample data</button></div>` : ''}
     </div>
-    <div class="stat-card">
-      <div class="sc-label">Win Rate</div>
-      <div class="sc-value accent">${valid.length?Math.round(wins/valid.length*100):'—'}%</div>
-      <div class="sc-sub">${wins}W / ${valid.length-wins}L</div>
-    </div>
-    <div class="stat-card">
-      <div class="sc-label">Avg Score</div>
-      <div class="sc-value" style="color:${scoreClr(avgScore)}">${avgScore.toFixed(0)}/100</div>
-      <div class="sc-sub">${scoreLabel(avgScore)}</div>
-    </div>
-    <div class="stat-card green-c">
-      <div class="sc-label">Best Session</div>
-      <div class="sc-value green">${bestS?fmtCr(bestS.net_pnl):'—'}</div>
-      <div class="sc-sub">${bestS?bestS.full:'—'}</div>
-    </div>
-    <div class="stat-card yellow-c">
-      <div class="sc-label">Total Charges</div>
-      <div class="sc-value yellow">${fmtCr(totalChg)}</div>
-      <div class="sc-sub">Ratio: ${chargeRatio.toFixed(1)}% of gross</div>
-    </div>
-    <div class="stat-card purple-c">
-      <div class="sc-label">Sessions</div>
-      <div class="sc-value accent">${sessions.length}</div>
-      <div class="sc-sub">${sessions.filter(s=>s.index==='Nifty').length}N · ${sessions.filter(s=>s.index==='BankNifty').length}BN · ${sessions.filter(s=>s.index==='Sensex').length}Sx</div>
-    </div>
+    ${hasData ? renderCfgStrip() : ''}
+    ${hasData && Object.keys(RAW.carry).length > 0 ? renderCarryPanel() : ''}
+    ${hasData ? renderUploadResults() : ''}
   `;
-  drawEquityChart();
-  drawScoreChart();
-  drawCePeChart();
 }
 
-function drawEquityChart() {
-  const c = document.getElementById('equity-chart');
-  const ctx = c.getContext('2d');
-  const valid = sessions.filter(s => s.net_pnl != null);
-  c.width = c.parentElement.offsetWidth - 40; c.height = 160;
-  const W=c.width, H=c.height, pad={l:72,r:20,t:16,b:36};
-  let cum=0;
-  const pts = valid.map(s => { cum+=s.net_pnl; return {label:s.date,val:cum}; });
-  if (!pts.length) return;
-  const vals=pts.map(p=>p.val);
-  const minV=Math.min(0,...vals), maxV=Math.max(0,...vals);
-  const range=maxV-minV||1;
-  ctx.clearRect(0,0,W,H);
-  const toX=i=>pad.l+(i/(pts.length-1||1))*(W-pad.l-pad.r);
-  const toY=v=>pad.t+(1-(v-minV)/range)*(H-pad.t-pad.b);
-  // Zero line
-  ctx.strokeStyle='#223352';ctx.lineWidth=1;ctx.setLineDash([4,4]);
-  ctx.beginPath();ctx.moveTo(pad.l,toY(0));ctx.lineTo(W-pad.r,toY(0));ctx.stroke();
-  ctx.setLineDash([]);
-  // Fill
-  const grad=ctx.createLinearGradient(0,pad.t,0,H-pad.b);
-  grad.addColorStop(0,'rgba(0,230,118,.22)');grad.addColorStop(1,'rgba(0,230,118,.02)');
-  ctx.beginPath();
-  pts.forEach((p,i)=>i===0?ctx.moveTo(toX(i),toY(p.val)):ctx.lineTo(toX(i),toY(p.val)));
-  ctx.lineTo(toX(pts.length-1),H-pad.b);ctx.lineTo(pad.l,H-pad.b);
-  ctx.fillStyle=grad;ctx.fill();
-  // Line
-  ctx.beginPath();ctx.strokeStyle='#00e676';ctx.lineWidth=2.5;
-  pts.forEach((p,i)=>i===0?ctx.moveTo(toX(i),toY(p.val)):ctx.lineTo(toX(i),toY(p.val)));
-  ctx.stroke();
-  // Dots + labels
-  pts.forEach((p,i)=>{
-    ctx.beginPath();ctx.arc(toX(i),toY(p.val),4,0,Math.PI*2);
-    ctx.fillStyle=p.val>=0?'#00e676':'#ff5252';ctx.fill();
-    ctx.fillStyle='#4a6080';ctx.font='10px JetBrains Mono';ctx.textAlign='center';
-    ctx.fillText(p.label,toX(i),H-pad.b+13);
-  });
-  ctx.fillStyle='#4a6080';ctx.font='10px JetBrains Mono';ctx.textAlign='right';
-  [minV,(minV+maxV)/2,maxV].forEach(v=>ctx.fillText(fmtCr(v),pad.l-5,toY(v)+4));
-}
-
-function drawScoreChart() {
-  const c=document.getElementById('score-chart');
-  const ctx=c.getContext('2d');
-  c.width=c.parentElement.offsetWidth-40;c.height=160;
-  const W=c.width,H=c.height,pad={l:28,r:16,t:20,b:36};
-  ctx.clearRect(0,0,W,H);
-  const n=sessions.length; if(!n)return;
-  const bw=Math.min(45,(W-pad.l-pad.r)/n-8);
-  sessions.forEach((s,i)=>{
-    const sc=s.scores?.overall||0;
-    const x=pad.l+i*(W-pad.l-pad.r)/n+(W-pad.l-pad.r)/(n*2)-bw/2;
-    const bH=(sc/100)*(H-pad.t-pad.b);
-    const y=H-pad.b-bH;
-    const col=scoreClr(sc);
-    const gr=ctx.createLinearGradient(0,y,0,H-pad.b);
-    gr.addColorStop(0,col);gr.addColorStop(1,col+'30');
-    ctx.fillStyle=gr;ctx.beginPath();ctx.roundRect(x,y,bw,bH,4);ctx.fill();
-    ctx.fillStyle=col;ctx.font='bold 11px JetBrains Mono';ctx.textAlign='center';
-    ctx.fillText(sc,x+bw/2,y-5);
-    ctx.fillStyle='#4a6080';ctx.font='10px JetBrains Mono';
-    ctx.fillText(s.date,x+bw/2,H-pad.b+13);
-  });
-  [55,75].forEach(v=>{
-    const y=H-pad.b-(v/100)*(H-pad.t-pad.b);
-    ctx.strokeStyle=v===75?'#00e67640':'#ffd74040';ctx.lineWidth=1;ctx.setLineDash([4,4]);
-    ctx.beginPath();ctx.moveTo(pad.l,y);ctx.lineTo(W-pad.r,y);ctx.stroke();ctx.setLineDash([]);
-  });
-}
-
-function drawCePeChart() {
-  const c=document.getElementById('cepe-chart');
-  const ctx=c.getContext('2d');
-  c.width=c.parentElement.offsetWidth-40;c.height=130;
-  const W=c.width,H=c.height,pad={l:72,r:16,t:16,b:36};
-  ctx.clearRect(0,0,W,H);
-  const valid=sessions.filter(s=>s.ce_pnl!=null&&s.pe_pnl!=null);
-  if(!valid.length)return;
-  const n=valid.length;
-  const allVals=[...valid.map(s=>s.ce_pnl),...valid.map(s=>s.pe_pnl),0];
-  const minV=Math.min(...allVals),maxV=Math.max(...allVals);
-  const range=maxV-minV||1;
-  const toX=i=>pad.l+i*(W-pad.l-pad.r)/(n);
-  const toY=v=>pad.t+(1-(v-minV)/range)*(H-pad.t-pad.b);
-  const bw=(W-pad.l-pad.r)/n*0.35;
-  // Zero line
-  ctx.strokeStyle='#223352';ctx.lineWidth=1;ctx.setLineDash([4,4]);
-  ctx.beginPath();ctx.moveTo(pad.l,toY(0));ctx.lineTo(W-pad.r,toY(0));ctx.stroke();ctx.setLineDash([]);
-  valid.forEach((s,i)=>{
-    const cx=toX(i)+bw*0.1;
-    const px=toX(i)+bw*1.2;
-    const zero=toY(0);
-    // CE bar
-    const cy=s.ce_pnl>=0?toY(s.ce_pnl):zero;
-    const ch=Math.abs(toY(s.ce_pnl)-zero);
-    ctx.fillStyle=s.ce_pnl>=0?'rgba(0,230,118,.7)':'rgba(255,82,82,.7)';
-    ctx.beginPath();ctx.roundRect(cx,cy,bw,ch||1,2);ctx.fill();
-    // PE bar
-    const py2=s.pe_pnl>=0?toY(s.pe_pnl):zero;
-    const ph=Math.abs(toY(s.pe_pnl)-zero);
-    ctx.fillStyle=s.pe_pnl>=0?'rgba(0,229,255,.7)':'rgba(255,107,107,.7)';
-    ctx.beginPath();ctx.roundRect(px,py2,bw,ph||1,2);ctx.fill();
-    // Label
-    ctx.fillStyle='#4a6080';ctx.font='10px JetBrains Mono';ctx.textAlign='center';
-    ctx.fillText(s.date,toX(i)+bw,H-pad.b+13);
-  });
-  // Legend
-  ctx.fillStyle='rgba(0,230,118,.8)';ctx.fillRect(pad.l,6,10,8);
-  ctx.fillStyle='#6a80a0';ctx.font='10px JetBrains Mono';ctx.textAlign='left';ctx.fillText('CE',pad.l+13,13);
-  ctx.fillStyle='rgba(0,229,255,.8)';ctx.fillRect(pad.l+36,6,10,8);
-  ctx.fillStyle='#6a80a0';ctx.fillText('PE',pad.l+49,13);
-  // Y axis labels
-  ctx.textAlign='right';
-  [minV,(minV+maxV)/2,maxV].forEach(v=>ctx.fillText(fmtCr(v),pad.l-5,toY(v)+4));
-}
-
-// ══════════════════════════════════════════════════
-//  SESSIONS TABLE
-// ══════════════════════════════════════════════════
-function renderSessionsTable() {
-  const q = (document.getElementById('sess-search')?.value||'').toLowerCase();
-  const filtered = sessions.filter(s =>
-    !q || (s.full||'').toLowerCase().includes(q) ||
-    (s.index||'').toLowerCase().includes(q) ||
-    (s.note||'').toLowerCase().includes(q)
-  );
-  document.getElementById('sess-tbody').innerHTML = filtered.map(s => `
-    <tr onclick="goDetail('${s.id}')">
-      <td><b>${s.full||s.date}</b>${s.csv_filename?` <span class="badge badge-blue" style="font-size:9px">CSV</span>`:''}</td>
-      <td><span class="badge badge-blue">${s.index||s.index_name||'—'}</span></td>
-      <td class="accent">${s.vix!=null?s.vix.toFixed(2):'—'}</td>
-      <td>${fmtCr(s.capital)}</td>
-      <td>${fmtPnl(s.gross_pnl)}</td>
-      <td>${fmtPnl(s.net_pnl)}</td>
-      <td>${fmtRoi(s.net_roi)}</td>
-      <td>${s.charges!=null?`<span class="yellow">${fmtCr(s.charges)}</span>`:'—'}</td>
-      <td><b style="color:${scoreClr(s.scores?.overall||0)}">${s.scores?.overall||'—'}</b></td>
-      <td onclick="event.stopPropagation()">
-        <div style="display:flex;gap:6px">
-          <button class="btn btn-ghost btn-sm" onclick="goDetail('${s.id}')">View</button>
-          ${userRole==='admin'?`<button class="btn btn-ghost btn-sm" onclick="openEditModal('${s.id}')">Edit</button>`:''}
-        </div>
-      </td>
-    </tr>`).join('');
-}
-
-function goDetail(id) {
-  document.getElementById('detail-sel').value = id;
-  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
-  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-  document.querySelectorAll('.nav-item')[2].classList.add('active');
-  document.getElementById('page-detail').classList.add('active');
-  renderDetail();
-}
-
-// ══════════════════════════════════════════════════
-//  DETAIL
-// ══════════════════════════════════════════════════
-function renderDetail() {
-  const id = document.getElementById('detail-sel').value;
-  const s = sessions.find(x=>x.id===id);
-  if (!s) return;
-  document.getElementById('edit-btn').style.display = userRole==='admin'?'':'none';
-
-  // Summary tab
-  document.getElementById('dt-summary').innerHTML = `
-    <div class="stat-grid">
-      <div class="stat-card ${(s.gross_pnl||0)>=0?'green-c':'red-c'}">
-        <div class="sc-label">Gross P&L</div>
-        <div class="sc-value ${(s.gross_pnl||0)>=0?'green':'red'}">${fmtCr(s.gross_pnl)}</div>
-      </div>
-      <div class="stat-card ${(s.net_pnl||0)>=0?'green-c':'red-c'}">
-        <div class="sc-label">Net P&L</div>
-        <div class="sc-value ${(s.net_pnl||0)>=0?'green':'red'}">${fmtCr(s.net_pnl)}</div>
-      </div>
-      <div class="stat-card ${(s.net_roi||0)>=0?'green-c':'red-c'}">
-        <div class="sc-label">Net ROI</div>
-        <div class="sc-value ${(s.net_roi||0)>=0?'green':'red'}">${s.net_roi!=null?(s.net_roi>=0?'+':'')+s.net_roi.toFixed(3)+'%':'—'}</div>
-      </div>
-      <div class="stat-card yellow-c">
-        <div class="sc-label">Charges</div>
-        <div class="sc-value yellow">${fmtCr(s.charges)}</div>
-        <div class="sc-sub">${s.gross_pnl&&s.charges?(s.charges/s.gross_pnl*100).toFixed(1)+'% of gross':''}</div>
-      </div>
-      <div class="stat-card">
-        <div class="sc-label">VIX</div>
-        <div class="sc-value accent">${s.vix!=null?s.vix.toFixed(2):'—'}</div>
-      </div>
-      <div class="stat-card">
-        <div class="sc-label">Capital</div>
-        <div class="sc-value">${fmtCr(s.capital)}</div>
-      </div>
-      <div class="stat-card ${(s.ce_pnl||0)>=0?'green-c':'red-c'}">
-        <div class="sc-label">CE P&L</div>
-        <div class="sc-value ${(s.ce_pnl||0)>=0?'green':'red'}">${fmtCr(s.ce_pnl)}</div>
-      </div>
-      <div class="stat-card ${(s.pe_pnl||0)>=0?'green-c':'red-c'}">
-        <div class="sc-label">PE P&L</div>
-        <div class="sc-value ${(s.pe_pnl||0)>=0?'green':'red'}">${fmtCr(s.pe_pnl)}</div>
-      </div>
+function renderCfgStrip() {
+  const cfg = RAW.metrics || {};
+  return `
+    <div id="cfg-strip">
+      <div class="form-row"><label>India VIX</label>
+        <input type="number" id="cfg-vix" value="${cfg.vix||''}" step="0.1" min="5" max="50" placeholder="e.g. 18.5" oninput="recompute()"></div>
+      <div class="form-row"><label>DTE</label>
+        <select id="cfg-dte" onchange="recompute()">${[0,1,2,3,4,5].map(d=>`<option value="${d}"${(cfg.dte||0)==d?' selected':''}>${d}</option>`).join('')}</select></div>
+      <div class="form-row"><label>Capital (₹)</label>
+        <input type="number" id="cfg-capital" value="${cfg.capital||20000000}" step="100000" oninput="recompute()"></div>
+      <div class="form-row"><label>Session char.</label>
+        <select id="cfg-char" onchange="recompute()"><option value="range">Range</option><option value="trend">Trend</option><option value="vrecovery">V-recovery</option><option value="gaptrend">Gap+Trend</option></select></div>
+      <div class="form-row"><label>Context</label>
+        <select id="cfg-ctx" onchange="recompute()"><option value="normal">Normal</option><option value="postevent">Post-event</option><option value="macro">Macro</option><option value="crash">Crash</option></select></div>
+      <div class="form-row"><label>Brokerage/lot ₹</label>
+        <input type="number" id="cfg-brok" value="${cfg.brokerage||0}" step="10" min="0" oninput="recompute()"></div>
     </div>
-    <div class="g3" style="margin-bottom:20px">
-      <div class="stat-card">
-        <div class="sc-label">Market Toughness</div>
-        <div class="sc-value accent">${s.mt!=null?s.mt.toFixed(2):'—'}/10</div>
-      </div>
-      <div class="stat-card">
-        <div class="sc-label">Orders</div>
-        <div class="sc-value">${s.executed!=null?s.executed:'—'}</div>
-        <div class="sc-sub">${s.rejected!=null?s.rejected+' rejected':''}</div>
-      </div>
-      <div class="stat-card ${(s.carry_out||0)>0?'yellow-c':'green-c'}">
-        <div class="sc-label">Carry Out</div>
-        <div class="sc-value ${(s.carry_out||0)>0?'yellow':'green'}">${s.carry_out||0} legs</div>
-      </div>
-    </div>
-    <div class="g2" style="margin-bottom:18px">
-      <div>
-        <div class="sec-title">Violations</div>
-        ${(s.violations||[]).map(v=>`<div class="list-item viol">${v}</div>`).join('')||'<div class="list-item viol" style="opacity:.4">None recorded</div>'}
-      </div>
-      <div>
-        <div class="sec-title">Strengths</div>
-        ${(s.strengths||[]).map(v=>`<div class="list-item str">${v}</div>`).join('')||'<div class="list-item str" style="opacity:.4">None recorded</div>'}
-      </div>
-    </div>
-    ${s.note?`<div class="info-box"><b>Note:</b> ${s.note}</div>`:''}
-    ${s.csv_filename?`<div class="info-box"><b>📄 CSV:</b> ${s.csv_filename}</div>`:''}
-  `;
+    <div class="card" style="margin-top:0">
+      <div class="card-title">Peer ROIs <span class="card-badge">comma-separated %</span></div>
+      <input type="text" id="cfg-peers" value="${(cfg.peer_rois||[]).join(',')}" placeholder="e.g. 0.25, 0.50, -0.10" oninput="recompute()">
+    </div>`;
+}
 
-  // Strikes tab
-  const strikes = s.strikes || [];
-  if (strikes.length) {
-    document.getElementById('dt-strikes').innerHTML = `
-      <div class="tbl-wrap">
-        <table>
-          <thead><tr><th>Symbol</th><th>Type</th><th>Strike</th><th>Expiry</th>
-            <th>Buy VWAP</th><th>Sell VWAP</th><th>Matched Qty</th><th>Realized P&L</th><th>Status</th></tr></thead>
-          <tbody>
-            ${strikes.map(st=>`<tr>
-              <td style="font-size:11px">${st.symbol}</td>
-              <td><span class="badge ${st.option_type==='CE'?'badge-blue':'badge-yellow'}">${st.option_type||'—'}</span></td>
-              <td>${st.strike||'—'}</td>
-              <td style="font-size:11px">${st.expiry||'—'}</td>
-              <td>${st.buy_vwap||'—'}</td>
-              <td>${st.sell_vwap||'—'}</td>
-              <td>${st.matched_qty||0}</td>
-              <td>${fmtPnl(st.realized)}</td>
-              <td>${st.is_carry?'<span class="badge badge-yellow">CARRY</span>':'<span class="badge badge-green">CLOSED</span>'}</td>
+function renderCarryPanel() {
+  const carry = RAW.carry;
+  return `
+    <div id="carry-panel">
+      <div class="card-title" style="color:var(--am)">⚠ Carry Positions Detected — Enter Previous Session Entry Prices</div>
+      ${Object.keys(carry).map(sym => {
+        const side = carry[sym].side, qty = carry[sym].qty;
+        return `<div class="carry-row">
+          <div class="carry-sym">${sym}</div>
+          <div class="carry-side"><span class="badge ${side==='BUY'?'b-gr':'b-rd'}">${side}</span></div>
+          <div class="carry-qty">${qty} qty</div>
+          <input type="number" id="carry-${sym}" placeholder="Entry price" step="0.01" style="width:130px" oninput="recompute()">
+          <select id="carrytype-${sym}" style="width:110px" onchange="recompute()"><option value="close">Close today</option><option value="open">Keep open</option></select>
+        </div>`;
+      }).join('')}
+      <div class="btn-row" style="margin-top:10px">
+        <button class="btn btn-sm" onclick="skipCarry()">Mark all as OPEN (unrealized)</button>
+      </div>
+    </div>`;
+}
+
+function renderUploadResults() {
+  const m = RAW.metrics;
+  if (!m) return '';
+  const grossRoi = (m.gross_pnl/m.capital*100).toFixed(4);
+  const netRoi = (m.net_pnl/m.capital*100).toFixed(4);
+  const cr = m.gross_pnl > 0 ? (m.charges/m.gross_pnl*100).toFixed(1) : 'N/A';
+  return `
+    <div class="grid4">
+      <div class="mc"><div class="mc-lbl">Gross P&L</div>
+        <div class="mc-val ${m.gross_pnl>=0?'pos':'neg'}">${fmtInr(m.gross_pnl)}</div>
+        <div class="mc-sub">${grossRoi}% of capital</div></div>
+      <div class="mc"><div class="mc-lbl">Net P&L</div>
+        <div class="mc-val ${m.net_pnl>=0?'pos':'neg'}">${fmtInr(m.net_pnl)}</div>
+        <div class="mc-sub">After ₹${Math.round(m.charges).toLocaleString('en-IN')} charges</div></div>
+      <div class="mc"><div class="mc-lbl">Charge Ratio</div>
+        <div class="mc-val neu">${cr}%</div>
+        <div class="mc-sub">of gross P&L</div></div>
+      <div class="mc"><div class="mc-lbl">Trades</div>
+        <div class="mc-val">${m.executed}</div>
+        <div class="mc-sub">${m.rejected} rejected</div></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Strike-wise P&L</div>
+      <table class="tbl">
+        <thead><tr><th>Symbol</th><th>Type</th><th>Sell Avg</th><th>Buy Avg</th><th>Qty</th><th>P&L</th><th>Status</th></tr></thead>
+        <tbody>
+          ${Object.entries(m.positions).map(([sym,p]) => `
+            <tr>
+              <td class="fm" style="font-size:11px">${sym}</td>
+              <td><span class="badge ${sym.endsWith('CE')?'b-rd':'b-gr'}">${sym.endsWith('CE')?'CE':'PE'}</span></td>
+              <td class="fm">${p.sa>0?'₹'+p.sa.toFixed(2):'—'}</td>
+              <td class="fm">${p.ba>0?'₹'+p.ba.toFixed(2):'—'}</td>
+              <td class="fm">${Math.max(p.sq,p.bq)}</td>
+              <td class="fm ${p.pnl>=0?'pos':'neg'}">${fmtInr(p.pnl)}</td>
+              <td><span class="badge ${p.open?'b-am':'b-bl'}">${p.open?'OPEN':'CLOSED'}</span></td>
             </tr>`).join('')}
-          </tbody>
-        </table>
-      </div>`;
-  } else {
-    document.getElementById('dt-strikes').innerHTML = `<div class="info-box">No strike data. Upload a CSV to parse strikes.</div>`;
-  }
-
-  // Chart tab
-  if (s.chart_image) {
-    document.getElementById('dt-chart').innerHTML = `
-      <div class="chart-img-wrap">
-        <img src="${s.chart_image}" alt="Day chart">
+        </tbody>
+      </table>
+    </div>
+    <div class="card">
+      <div class="card-title">Upload Chart Screenshot <span class="card-badge">optional</span></div>
+      <div style="display:flex;gap:12px;align-items:flex-start">
+        <div><button class="btn btn-sm" onclick="document.getElementById('chart-img-inp').click()">📷 Choose Image</button>
+          <input type="file" id="chart-img-inp" accept="image/*" style="display:none" onchange="handleChartImg(this)"></div>
+        <div class="chart-img-wrap" id="chart-preview" style="flex:1;min-height:50px">
+          ${RAW.chartFile?`<img src="${RAW.chartFile}" alt="chart">`:'<span style="font-size:11px;color:var(--tx3)">No image uploaded</span>'}
+        </div>
       </div>
-      <div style="margin-top:10px;color:var(--muted2);font-size:12px;font-family:var(--font-mono)">
-        Day chart for ${s.full||s.date} · ${s.index||s.index_name}
-      </div>`;
-  } else {
-    document.getElementById('dt-chart').innerHTML = `<div class="info-box">No chart uploaded. Go to Charts &amp; Journal to upload one.</div>`;
+    </div>
+    <div class="card admin-only">
+      <div class="card-title">Save to Server</div>
+      <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr">
+        <div class="form-row"><label>Date</label><input type="text" id="save-date" value="${m.date_id||getTodayId()}" placeholder="YYYY-MM-DD"></div>
+        <div class="form-row"><label>Index</label>
+          <select id="save-index">${['Nifty','BankNifty','Sensex','FinNifty','Nifty+Sensex','Nifty+BankNifty'].map(i=>`<option${i===m.index?' selected':''}>${i}</option>`).join('')}</select></div>
+        <div class="form-row"><label>Notes (optional)</label><input type="text" id="save-notes" placeholder="e.g. expiry week"></div>
+      </div>
+      <div class="btn-row" style="margin-top:12px">
+        <button class="btn btn-gr" onclick="saveFromUpload()">💾 Save to Server</button>
+        <button class="btn btn-sm btn-rd" onclick="resetUpload()">✕ Clear</button>
+      </div>
+    </div>`;
+}
+
+// ── CSV PARSING ───────────────────────────────────────────────
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('drop-zone').classList.remove('drag');
+  const f = e.dataTransfer.files[0];
+  if (f) parseCSV(f);
+}
+function handleFileInput(inp) { if (inp.files[0]) parseCSV(inp.files[0]); }
+function parseCSV(file) {
+  Papa.parse(file, {
+    header:true, skipEmptyLines:true,
+    complete(res) { processCSV(res.data); }
+  });
+}
+
+function getCol(row, ...keys) {
+  for (const k of keys) {
+    for (const col in row) {
+      if (col.trim().toLowerCase().replace(/[\s_\-]/g,'') === k.toLowerCase().replace(/[\s_\-]/g,''))
+        return row[col]?.trim() || '';
+    }
+  }
+  return '';
+}
+
+function isExecuted(row) {
+  const s = getCol(row,'status','orderstatus','order_status','state').toLowerCase();
+  if (!s) return true; // no status column — treat all as executed
+  return s.includes('complet') || s.includes('execut') || s.includes('traded') || s.includes('filled') || s === 'done';
+}
+
+function processCSV(rows) {
+  const exec = rows.filter(r => isExecuted(r));
+  const rej  = rows.filter(r => {
+    const s = getCol(r,'status','orderstatus','order_status','state').toLowerCase();
+    return s.includes('reject') || s.includes('cancel') || s.includes('failed');
+  });
+
+  if (exec.length === 0) { toast('No executed trades found in CSV — check Status column values', 'err'); return; }
+
+  const agg = {};
+  let totalBV = 0, totalSV = 0;
+  for (const r of exec) {
+    const sym  = getCol(r,'symbolname','symbol name','symbol','tradingsymbol','scripname').trim().toUpperCase();
+    const side = getCol(r,'side','transactiontype','transaction_type','buysell','buy_sell','b/s').toUpperCase();
+    const qty  = parseInt(getCol(r,'qty','quantity','tradedqty','filledqty','filled_quantity','tradeqty'))||0;
+    const price= parseFloat(getCol(r,'tradedprice','traded price','averageprice','average_price','avg_price','tradeprice','price'))||0;
+    if (!sym || qty<=0 || price<=0) continue;
+    const val = qty * price;
+    if (!agg[sym]) agg[sym] = {bq:0,bv:0,sq:0,sv:0,open:false};
+    const isBuy = side.includes('BUY') || side === 'B' || side === 'LONG';
+    const isSell= side.includes('SELL')|| side === 'S' || side === 'SHORT';
+    if (isBuy)  { agg[sym].bq+=qty; agg[sym].bv+=val; totalBV+=val; }
+    else if (isSell) { agg[sym].sq+=qty; agg[sym].sv+=val; totalSV+=val; }
   }
 
-  // Journal tab
-  const journal = s.journal || '';
-  document.getElementById('dt-journal').innerHTML = journal
-    ? `<div class="journal-view">${escHtml(journal)}</div>`
-    : `<div class="info-box">No journal entry. Go to Charts &amp; Journal to add notes.</div>`;
+  if (Object.keys(agg).length === 0) { toast('Could not parse any trades — check Symbol, Side, Qty, Price columns', 'err'); return; }
 
-  // AI tab
-  document.getElementById('dt-ai').innerHTML = s.ai_commentary
-    ? `<div class="info-box" style="line-height:1.8">${s.ai_commentary.replace(/\n/g,'<br>')}</div>`
-    : `<div class="info-box">No AI commentary yet. Click "✦ AI Commentary" above to generate.</div>`;
+  const carry = {};
+  for (const [sym, d] of Object.entries(agg)) {
+    if (d.bq>0 && d.sq===0) carry[sym] = {side:'BUY', qty:d.bq};
+    if (d.sq>0 && d.bq===0) carry[sym] = {side:'SELL', qty:d.sq};
+  }
+
+  RAW.trades = exec; RAW.agg = agg; RAW.carry = carry; RAW.metrics = null;
+  recompute();
+  toast(`Parsed ${exec.length} executions, ${rej.length} rejections, ${Object.keys(agg).length} symbols`, 'ok');
+  renderView();
 }
 
-function escHtml(s) {
-  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+function recompute() {
+  if (!RAW.trades.length) return;
+  const agg = RAW.agg;
+  const vix = parseFloat(document.getElementById('cfg-vix')?.value)||0;
+  const dte = parseInt(document.getElementById('cfg-dte')?.value)||0;
+  const capital = parseInt(document.getElementById('cfg-capital')?.value)||20000000;
+  const brokerage = parseFloat(document.getElementById('cfg-brok')?.value)||0;
+  const peers = (document.getElementById('cfg-peers')?.value||'').split(',').map(x=>parseFloat(x.trim())).filter(x=>!isNaN(x));
+  const character = document.getElementById('cfg-char')?.value||'range';
+  const context = document.getElementById('cfg-ctx')?.value||'normal';
+
+  let totalBV=0, totalSV=0, grossPnl=0, cePnl=0, pePnl=0;
+  const positions = {};
+  let openCount = 0;
+
+  for (const [sym, d] of Object.entries(agg)) {
+    const ba = d.bq ? d.bv/d.bq : 0;
+    const sa = d.sq ? d.sv/d.sq : 0;
+    let pnl=0, open=false;
+
+    if (RAW.carry[sym]) {
+      const inp = document.getElementById('carry-'+sym);
+      const tp  = document.getElementById('carrytype-'+sym);
+      if (inp && inp.value) {
+        const ep = parseFloat(inp.value);
+        pnl = RAW.carry[sym].side==='SELL' ? (ep - ba)*d.bq : (sa - ep)*d.sq;
+      } else { open=true; openCount++; pnl=(sa-ba)*Math.min(d.bq,d.sq); }
+      if (tp && tp.value==='open') open=true;
+    } else {
+      const matched = Math.min(d.bq, d.sq);
+      pnl = matched > 0 ? (sa-ba)*matched : 0;
+      open = d.bq !== d.sq;
+      if (open) openCount++;
+    }
+
+    positions[sym] = {ba, sa, bq:d.bq, sq:d.sq, pnl, open};
+    grossPnl += pnl;
+    totalBV += d.bv; totalSV += d.sv;
+    if (sym.endsWith('CE')) cePnl += pnl;
+    else if (sym.endsWith('PE')) pePnl += pnl;
+  }
+
+  const stt      = totalSV * 0.0015;
+  const exchange = (totalBV+totalSV) * 0.00053;
+  const sebi     = ((totalBV+totalSV)/1e7) * 10;
+  const stamp    = totalBV * 0.00003;
+  const gst      = (exchange+sebi) * 0.18;
+  const charges  = stt+exchange+sebi+stamp+gst+brokerage;
+  const netPnl   = grossPnl - charges;
+  const mt       = computeMT(vix, dte, character, context);
+
+  RAW.metrics = {
+    vix, dte, capital, brokerage, peer_rois:peers,
+    gross_pnl:Math.round(grossPnl), net_pnl:Math.round(netPnl),
+    ce_pnl:Math.round(cePnl), pe_pnl:Math.round(pePnl),
+    charges:Math.round(charges),
+    charges_breakdown:{stt,exchange,sebi,stamp,gst,brokerage},
+    executed:RAW.trades.length, rejected:0, mt, positions,
+    carry_out:openCount, index:'Nifty', date_id:getTodayId()
+  };
 }
 
-// ══════════════════════════════════════════════════
+function computeMT(vix, dte, ch, ctx) {
+  const vixS = vix<13?2:vix<16?4:vix<20?6:vix<24?7:vix<28?8:9;
+  const dteS = dte>=5?3:dte>=3?5:dte===2?6:dte===1?8:10;
+  const chS  = {range:2,trend:7,vrecovery:8,gaptrend:9}[ch]||3;
+  const ctxS = {normal:3,postevent:7,crash:7,macro:8}[ctx]||3;
+  return +(vixS*.20+dteS*.25+chS*.30+ctxS*.25).toFixed(2);
+}
+
+function skipCarry() {
+  Object.keys(RAW.carry).forEach(sym => {
+    const tp = document.getElementById('carrytype-'+sym);
+    if (tp) tp.value = 'open';
+  });
+  recompute();
+}
+
+function handleChartImg(inp) {
+  const f = inp.files[0]; if (!f) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    RAW.chartFile = e.target.result;
+    const prev = document.getElementById('chart-preview');
+    if (prev) prev.innerHTML = `<img src="${e.target.result}" alt="chart">`;
+    toast('Chart image attached', 'ok');
+  };
+  reader.readAsDataURL(f);
+}
+
+async function saveFromUpload() {
+  if (USER_ROLE !== 'admin') { toast('Admin only', 'err'); return; }
+  const m = RAW.metrics; if (!m) { toast('No data to save', 'err'); return; }
+  const dateId = document.getElementById('save-date')?.value.trim() || getTodayId();
+  const idx    = document.getElementById('save-index')?.value || 'Nifty';
+  const notes  = document.getElementById('save-notes')?.value.trim() || '';
+  const d = new Date(dateId);
+  const mo = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const sess = {
+    id:dateId,
+    date:`${mo[d.getMonth()]} ${d.getDate()}`,
+    full:`${String(d.getDate()).padStart(2,'0')}-${mo[d.getMonth()]}-${d.getFullYear()}`,
+    index:idx, dte:m.dte, vix:m.vix, capital:m.capital,
+    net_pnl:m.net_pnl, gross_pnl:m.gross_pnl,
+    net_roi:+(m.net_pnl/m.capital*100).toFixed(6),
+    gross_roi:+(m.gross_pnl/m.capital*100).toFixed(6),
+    pe_pnl:m.pe_pnl, ce_pnl:m.ce_pnl,
+    charges:m.charges, charges_breakdown:m.charges_breakdown,
+    executed:m.executed, rejected:m.rejected, mt:m.mt,
+    peer_rois:m.peer_rois, carry_out:m.carry_out, notes,
+    scores:{overall:0,discipline:0,cap_eff:0,trade_q:0,mkt_align:0,vol_handle:0,peer_cmp:0},
+    violations:[], strengths:[], positions:Object.entries(m.positions).map(([sym,p])=>({
+      sym, strike:parseStrike(sym),
+      side:p.sq>p.bq?'SHORT':'LONG',
+      entry:+(p.sq>p.bq?p.sa:p.ba).toFixed(2),
+      exit:+(p.sq>p.bq?p.ba:p.sa).toFixed(2),
+      qty:Math.max(p.sq,p.bq), pnl:Math.round(p.pnl), open:p.open
+    })),
+    time_pnl:{}, chart_img:RAW.chartFile||null
+  };
+  try {
+    await saveSession(sess);
+    // Upload chart if attached
+    if (RAW.chartFile && RAW.chartFile.startsWith('data:image')) {
+      const res = await fetch(RAW.chartFile);
+      const blob = await res.blob();
+      const fd = new FormData();
+      fd.append('file', blob, 'chart.png');
+      const token = getToken();
+      await fetch(`/upload-chart/${dateId}`, { method:'POST', headers:{'Authorization':`Bearer ${token}`}, body:fd });
+    }
+    await loadSessions();
+    CUR = SESSIONS.find(s => s.id === dateId) || SESSIONS[0];
+    toast(`Session ${sess.full} saved`, 'ok');
+    resetUpload();
+    setView('overview');
+  } catch(e) { toast(e.message, 'err'); }
+}
+
+function parseStrike(sym) {
+  const m = sym.match(/(\d{4,6})(CE|PE)$/i);
+  return m ? `${m[1]}${m[2].toUpperCase()}` : sym;
+}
+
+function resetUpload() {
+  RAW = {trades:[],agg:{},carry:{},metrics:null,chartFile:null};
+  renderView();
+}
+
+function loadSampleCSV() {
+  const rows = [
+    {Symbol:'NIFTY2641023300CE',Side:'SELL',Qty:'375',TradedPrice:'98',Status:'Executed'},
+    {Symbol:'NIFTY2641023300CE',Side:'BUY', Qty:'375',TradedPrice:'62',Status:'Executed'},
+    {Symbol:'NIFTY2641022700PE',Side:'SELL',Qty:'750',TradedPrice:'92',Status:'Executed'},
+    {Symbol:'NIFTY2641022700PE',Side:'BUY', Qty:'750',TradedPrice:'8', Status:'Executed'},
+    {Symbol:'NIFTY2641023100CE',Side:'SELL',Qty:'375',TradedPrice:'155',Status:'Executed'},
+    {Symbol:'NIFTY2641023100CE',Side:'BUY', Qty:'375',TradedPrice:'175',Status:'Executed'},
+  ];
+  processCSV(rows);
+}
+
+// ══════════════════════════════════════════════════════════════
+//  OVERVIEW VIEW
+// ══════════════════════════════════════════════════════════════
+function vOverview() {
+  if (!CUR) return noSession();
+  const s = CUR;
+  const cr = s.gross_pnl>0 ? (s.charges/s.gross_pnl*100).toFixed(1) : 'N/A';
+  const ceA=Math.abs(s.ce_pnl||0), peA=Math.abs(s.pe_pnl||0), tot=ceA+peA||1;
+  return `
+    <div class="grid4">
+      <div class="mc"><div class="mc-lbl">Gross P&L</div>
+        <div class="mc-val ${(s.gross_pnl||0)>=0?'pos':'neg'}">${fmtInr(s.gross_pnl||0)}</div>
+        <div class="mc-sub">${(s.gross_roi||0).toFixed(4)}% of ₹${fmtCr(s.capital)}</div></div>
+      <div class="mc"><div class="mc-lbl">Net P&L</div>
+        <div class="mc-val ${(s.net_pnl||0)>=0?'pos':'neg'}">${fmtInr(s.net_pnl||0)}</div>
+        <div class="mc-sub">After ₹${(s.charges||0).toLocaleString('en-IN')} charges (${cr}%)</div></div>
+      <div class="mc"><div class="mc-lbl">Score</div>
+        <div class="mc-val" style="color:${scCol(s.scores.overall)}">${s.scores.overall}/100</div>
+        <div class="mc-sub" style="color:${scCol(s.scores.overall)}">${scLbl(s.scores.overall)}</div></div>
+      <div class="mc"><div class="mc-lbl">Market Toughness</div>
+        <div class="mc-val" style="color:${(s.mt||0)>=7?'var(--rd)':(s.mt||0)>=5?'var(--am)':'var(--gr)'}">${s.mt||'—'}/10</div>
+        <div class="mc-sub">VIX ${s.vix||'—'} · DTE ${s.dte}</div></div>
+    </div>
+    <div class="grid2">
+      <div class="card"><div class="card-title">Intraday P&L Curve</div><div class="chart-wrap"><canvas id="eq-chart"></canvas></div></div>
+      <div class="card">
+        <div class="card-title">CE vs PE Split</div>
+        <div class="split-bar" style="height:10px;margin:12px 0 6px">
+          <div style="width:${ceA/tot*100}%;background:var(--rd);border-radius:4px 0 0 4px"></div>
+          <div style="width:${peA/tot*100}%;background:var(--gr);border-radius:0 4px 4px 0"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:14px">
+          <span style="color:var(--rd)">CE: ${fmtInr(s.ce_pnl||0)}</span>
+          <span style="color:var(--gr)">PE: ${fmtInr(s.pe_pnl||0)}</span>
+        </div>
+        <div class="chart-wrap-sm"><canvas id="cepe-chart"></canvas></div>
+      </div>
+    </div>
+    <div class="grid2">
+      <div class="card">
+        <div class="card-title">Strengths</div>
+        ${s.strengths.length ? s.strengths.map(t=>`<div class="alert-row"><div class="adot" style="background:var(--gr)"></div><div style="font-size:12px">${t}</div></div>`).join('') : '<div style="font-size:11px;color:var(--tx3)">None recorded</div>'}
+      </div>
+      <div class="card">
+        <div class="card-title">Violations <span class="card-badge">${s.violations.length} flagged</span></div>
+        ${s.violations.length ? s.violations.map(v=>`<div class="alert-row"><div class="adot" style="background:var(--am)"></div><div style="font-size:12px;color:var(--am)">${v}</div></div>`).join('') : '<div style="font-size:11px;color:var(--gr)">No violations recorded ✓</div>'}
+      </div>
+    </div>
+    ${s.peer_rois&&s.peer_rois.length ? `<div class="card"><div class="card-title">Peer Comparison</div>${renderPeerBars(s)}</div>` : ''}
+    ${s.chart_img ? `<div class="card"><div class="card-title">Session Chart</div><div class="chart-img-wrap"><img src="${s.chart_img}" alt="session chart" style="max-height:280px"></div></div>` : ''}
+    ${s.ai_commentary ? `<div class="card"><div class="card-title">AI Commentary</div><div style="font-size:13px;line-height:1.8;color:var(--tx2)">${s.ai_commentary.replace(/\n/g,'<br>')}</div></div>` : ''}
+    <div style="text-align:right;display:flex;gap:8px;justify-content:flex-end">
+      <button class="btn btn-sm admin-only" onclick="openEditModal('${s.id}')">✏ Edit Session</button>
+      <button class="btn btn-sm btn-pr admin-only" onclick="generateAI('${s.id}')">✦ AI Commentary</button>
+    </div>`;
+}
+
+function renderPeerBars(s) {
+  const myRoi = s.net_roi || 0;
+  const all = [{lbl:'You',roi:myRoi}, ...(s.peer_rois||[]).map((r,i)=>({lbl:`Peer ${i+1}`,roi:r}))];
+  const maxAbs = Math.max(...all.map(x=>Math.abs(x.roi)),0.01);
+  return all.map(p => `
+    <div class="peer-row">
+      <div style="width:60px;font-size:11px;color:${p.lbl==='You'?'var(--bl)':'var(--tx2)'};font-weight:${p.lbl==='You'?600:400}">${p.lbl}</div>
+      <div class="peer-bar-wrap"><div class="peer-bar-fill" style="width:${Math.abs(p.roi)/maxAbs*100}%;background:${p.roi>=0?'var(--gr)':'var(--rd)'}"></div></div>
+      <div class="peer-val ${p.roi>=0?'pos':'neg'}">${p.roi>0?'+':''}${p.roi.toFixed(4)}%</div>
+    </div>`).join('');
+}
+
+// ══════════════════════════════════════════════════════════════
+//  STRIKE P&L VIEW
+// ══════════════════════════════════════════════════════════════
+function vStrikes() {
+  if (!CUR) return noSession();
+  const s = CUR;
+  const pos = s.positions || [];
+  return `
+    <div class="card">
+      <div class="card-title">Strike-wise P&L — ${s.full} <span class="card-badge">${pos.length} strikes</span></div>
+      ${pos.length ? `
+      <table class="tbl">
+        <thead><tr><th>Symbol</th><th>Type</th><th>Side</th><th>Entry</th><th>Exit</th><th>Qty</th><th>P&L</th><th>Status</th></tr></thead>
+        <tbody>
+          ${pos.map(p=>`<tr>
+            <td class="fm" style="font-size:11px">${p.sym||p.strike||'—'}</td>
+            <td><span class="badge ${(p.sym||'').endsWith('CE')?'b-rd':'b-gr'}">${(p.sym||'').endsWith('CE')?'CE':'PE'}</span></td>
+            <td><span class="badge ${p.side==='SHORT'?'b-rd':'b-gr'}">${p.side||'—'}</span></td>
+            <td class="fm">₹${p.entry||0}</td>
+            <td class="fm">₹${p.exit||0}</td>
+            <td class="fm">${p.qty||0}</td>
+            <td class="fm ${(p.pnl||0)>=0?'pos':'neg'}">${fmtInr(p.pnl||0)}</td>
+            <td><span class="badge ${p.open?'b-am':'b-bl'}">${p.open?'⚠ OPEN':'CLOSED'}</span></td>
+          </tr>`).join('')}
+        </tbody>
+      </table>
+      <div style="display:flex;gap:24px;margin-top:12px;padding-top:10px;border-top:1px solid var(--bd)">
+        <span style="font-size:12px;color:var(--tx2)">CE: <span class="fm ${(s.ce_pnl||0)>=0?'pos':'neg'}">${fmtInr(s.ce_pnl||0)}</span></span>
+        <span style="font-size:12px;color:var(--tx2)">PE: <span class="fm ${(s.pe_pnl||0)>=0?'pos':'neg'}">${fmtInr(s.pe_pnl||0)}</span></span>
+        <span style="font-size:12px;color:var(--tx2)">Gross: <span class="fm ${(s.gross_pnl||0)>=0?'pos':'neg'}">${fmtInr(s.gross_pnl||0)}</span></span>
+      </div>` : '<div style="color:var(--tx3);font-size:12px">No strike data. Upload a CSV to parse individual strikes.</div>'}
+    </div>
+    ${s.time_pnl&&Object.keys(s.time_pnl).length ? `
+    <div class="card">
+      <div class="card-title">Time-of-Day P&L</div>
+      ${Object.entries(s.time_pnl).map(([t,v])=>{
+        const maxV=Math.max(...Object.values(s.time_pnl).map(Math.abs),1);
+        const pct=Math.abs(v)/maxV*100;
+        const bg=v>0?`rgba(63,185,80,${.1+pct*.007})`:`rgba(248,81,73,${.1+pct*.007})`;
+        return `<div class="hm-row"><div class="hm-lbl">${t}</div><div class="hm-bar" style="background:${bg}"><span class="hm-val ${v>=0?'pos':'neg'}">${fmtInr(v)}</span></div></div>`;
+      }).join('')}
+    </div>` : ''}`;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SCORING VIEW
+// ══════════════════════════════════════════════════════════════
+function vScoring() {
+  if (!CUR) return noSession();
+  const s = CUR, sc = s.scores;
+  const dims = [
+    ['Discipline',sc.discipline,'30%'],['Capital Efficiency',sc.cap_eff,'25%'],
+    ['Trade Quality',sc.trade_q,'20%'],['Market Alignment',sc.mkt_align,'10%'],
+    ['Volatility Handling',sc.vol_handle,'10%'],['Peer Comparison',sc.peer_cmp,'5%'],
+  ];
+  return `
+    <div class="card">
+      <div class="card-title">Session Scorecard — ${s.full}</div>
+      <div class="ring-section">
+        <div class="ring-wrap"><canvas id="ring-chart" width="110" height="110"></canvas>
+          <div class="ring-center"><div class="ring-val" style="color:${scCol(sc.overall)}">${sc.overall}</div><div class="ring-lbl">${scLbl(sc.overall)}</div></div>
+        </div>
+        <div class="dims">
+          ${dims.map(([lbl,val,wt])=>`<div class="dim">
+            <div class="dim-row"><span>${lbl} <span style="color:var(--tx3);font-size:9px">${wt}</span></span><span style="color:${scCol(val)};font-weight:600">${val}</span></div>
+            <div class="pbar"><div class="pfill" style="width:${val}%;background:${scCol(val)}"></div></div>
+          </div>`).join('')}
+        </div>
+      </div>
+    </div>
+    <div class="grid2">
+      <div class="card">
+        <div class="card-title">Violations <span class="card-badge">${s.violations.length}</span></div>
+        ${s.violations.length?s.violations.map(v=>`<div class="alert-row"><div class="adot" style="background:var(--am)"></div><div style="font-size:12px;color:var(--am)">${v}</div></div>`).join(''):'<div style="color:var(--gr);font-size:11px">No violations ✓</div>'}
+      </div>
+      <div class="card">
+        <div class="card-title">Strengths <span class="card-badge">${s.strengths.length}</span></div>
+        ${s.strengths.length?s.strengths.map(t=>`<div class="alert-row"><div class="adot" style="background:var(--gr)"></div><div style="font-size:12px">${t}</div></div>`).join(''):'<div style="color:var(--tx3);font-size:11px">None recorded</div>'}
+      </div>
+    </div>
+    <div class="card" style="text-align:right">
+      <button class="btn btn-sm btn-pr admin-only" onclick="openEditModal('${s.id}')">✏ Edit Scores / Violations / Strengths</button>
+    </div>`;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  CHARGES VIEW
+// ══════════════════════════════════════════════════════════════
+function vCharges() {
+  if (!CUR) return noSession();
+  const s = CUR, cb = s.charges_breakdown || {};
+  const cr = s.gross_pnl>0 ? (s.charges/s.gross_pnl*100).toFixed(2) : 'N/A';
+  const items = [
+    ['STT (0.15% on sell side)', cb.stt||0],
+    ['NSE Exchange Fee (0.053% both)', cb.exchange||0],
+    ['SEBI Fee (₹10 per Crore)', cb.sebi||0],
+    ['Stamp Duty (0.003% on buy)', cb.stamp||0],
+    ['GST (18% on Exchange+SEBI)', cb.gst||0],
+    ['Brokerage', cb.brokerage||0],
+  ];
+  return `
+    <div class="card">
+      <div class="card-title">Charges Breakdown — ${s.full} <span class="card-badge">post-Budget 2024</span></div>
+      ${items.map(([l,v])=>`<div class="chg-row"><div class="chg-lbl">${l}</div><div class="chg-val">${fmtInr(Math.round(v))}</div></div>`).join('')}
+      <div class="chg-row" style="border-top:1px solid var(--bd2);margin-top:4px;padding-top:10px">
+        <div class="chg-lbl" style="font-weight:600;color:var(--tx)">Total Charges</div>
+        <div class="chg-val" style="color:var(--rd)">${fmtInr(s.charges||0)}</div>
+      </div>
+    </div>
+    <div class="grid3">
+      <div class="mc"><div class="mc-lbl">Gross P&L</div><div class="mc-val ${(s.gross_pnl||0)>=0?'pos':'neg'}">${fmtInr(s.gross_pnl||0)}</div></div>
+      <div class="mc"><div class="mc-lbl">Total Charges</div><div class="mc-val neg">−${fmtInr(s.charges||0)}</div></div>
+      <div class="mc"><div class="mc-lbl">Net P&L</div><div class="mc-val ${(s.net_pnl||0)>=0?'pos':'neg'}">${fmtInr(s.net_pnl||0)}</div>
+        <div class="mc-sub">Charge ratio: ${cr}% of gross</div></div>
+    </div>`;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  JOURNAL VIEW
+// ══════════════════════════════════════════════════════════════
+function vJournal() {
+  if (!CUR) return noSession();
+  const s = CUR;
+  return `
+    <div class="card">
+      <div class="card-title">Trade Journal — ${s.full}
+        <span class="card-badge">${s.index} · VIX ${s.vix||'—'}</span>
+      </div>
+      ${s.chart_img ? `
+        <div class="card-title" style="margin-top:10px">Session Chart</div>
+        <div class="chart-img-wrap" style="margin-bottom:14px"><img src="${s.chart_img}" alt="chart"></div>
+      ` : ''}
+      <div class="admin-only">
+        <div style="margin-bottom:8px">
+          <button class="btn btn-sm" onclick="document.getElementById('jrn-chart-inp').click()">📷 Upload/Replace Chart</button>
+          <input type="file" id="jrn-chart-inp" accept="image/*" style="display:none" onchange="uploadChartFromJournal(this)">
+          ${s.chart_img ? `<button class="btn btn-sm btn-rd" style="margin-left:8px" onclick="deleteChartFromJournal()">Remove Chart</button>` : ''}
+        </div>
+      </div>
+      <div class="card-title" style="margin-top:14px">Notes</div>
+      <div class="admin-only">
+        <textarea id="jrn-text" rows="10" placeholder="Pre-market plan, trade rationale, post-session observations, lessons learned…">${s.journal||''}</textarea>
+        <div class="btn-row" style="margin-top:10px">
+          <button class="btn btn-gr btn-sm" onclick="saveJournal()">💾 Save Journal</button>
+        </div>
+      </div>
+      ${USER_ROLE !== 'admin' ? `<div style="white-space:pre-wrap;font-size:13px;line-height:1.8;color:var(--tx2);font-family:var(--fm)">${s.journal||'<span style="color:var(--tx3)">No journal entry</span>'}</div>` : ''}
+    </div>`;
+}
+
+function bindJournalEvents() {}
+
+async function saveJournal() {
+  if (!CUR || USER_ROLE !== 'admin') return;
+  const journal = document.getElementById('jrn-text')?.value || '';
+  try {
+    await saveSession({...CUR, journal});
+    await loadSessions();
+    CUR = SESSIONS.find(s => s.id === CUR.id) || CUR;
+    CUR.journal = journal;
+    toast('Journal saved', 'ok');
+  } catch(e) { toast(e.message, 'err'); }
+}
+
+async function uploadChartFromJournal(inp) {
+  if (!CUR || !inp.files[0]) return;
+  const fd = new FormData();
+  fd.append('file', inp.files[0]);
+  const token = getToken();
+  try {
+    const res = await fetch(`/upload-chart/${CUR.id}`, { method:'POST', headers:{'Authorization':`Bearer ${token}`}, body:fd });
+    if (!res.ok) { const e=await res.json(); throw new Error(e.detail); }
+    await loadSessions();
+    CUR = SESSIONS.find(s => s.id === CUR.id) || CUR;
+    renderView();
+    toast('Chart uploaded', 'ok');
+  } catch(e) { toast(e.message, 'err'); }
+}
+
+async function deleteChartFromJournal() {
+  if (!CUR) return;
+  try {
+    await apiFetch(`/upload-chart/${CUR.id}`, { method:'DELETE' });
+    await loadSessions();
+    CUR = SESSIONS.find(s => s.id === CUR.id) || CUR;
+    renderView();
+    toast('Chart removed', 'ok');
+  } catch(e) { toast(e.message, 'err'); }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  SESSIONS VIEW
+// ══════════════════════════════════════════════════════════════
+function vSessions() {
+  if (!SESSIONS.length) return `<div class="empty"><span class="empty-ico">📂</span><div class="empty-txt">No sessions yet</div><div class="empty-sub">Upload a CSV or use "+ Add Session"</div></div>`;
+  return `
+    <div class="card" style="padding:0">
+      <div style="padding:12px 14px;border-bottom:1px solid var(--bd);display:flex;align-items:center;justify-content:space-between">
+        <div class="card-title" style="margin:0">All Sessions <span class="card-badge">${SESSIONS.length}</span></div>
+        <div class="btn-row">
+          <button class="btn btn-sm btn-pr admin-only" onclick="openAddModal()">+ Add Session</button>
+          <button class="btn btn-sm" onclick="exportAllJSON()">⬇ Export All</button>
+        </div>
+      </div>
+      ${SESSIONS.map(s=>`
+        <div class="sess-item ${CUR&&CUR.id===s.id?'sel':''}" onclick="selectSession('${s.id}')">
+          <div class="sess-left">
+            <div class="sess-date">${s.full}</div>
+            <div class="sess-idx">${s.index||s.index_name} · DTE=${s.dte} · VIX ${s.vix||'—'} · MT ${s.mt||'—'}</div>
+          </div>
+          <div style="flex:1">
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              ${s.violations.length?`<span class="badge b-am">${s.violations.length} violations</span>`:'<span class="badge b-gr">clean</span>'}
+              ${s.carry_out?`<span class="badge b-am">${s.carry_out} carry</span>`:''}
+              <span class="badge b-bl">Score ${s.scores.overall}</span>
+              ${s.chart_img?'<span class="badge b-pr">📷 chart</span>':''}
+              ${s.journal?'<span class="badge b-pr">📝 journal</span>':''}
+            </div>
+          </div>
+          <div class="sess-right">
+            <div class="sess-pnl ${(s.net_pnl||0)>=0?'pos':'neg'}">${fmtInr(s.net_pnl||0)}</div>
+            <div class="sess-roi ${(s.net_roi||0)>=0?'pos':'neg'}">${(s.net_roi||0)>0?'+':''}${(s.net_roi||0).toFixed(4)}%</div>
+          </div>
+          <div style="display:flex;gap:6px;margin-left:8px">
+            <button class="btn btn-sm admin-only" onclick="event.stopPropagation();openEditModal('${s.id}')" title="Edit">✏</button>
+            <button class="btn btn-sm btn-rd admin-only" onclick="event.stopPropagation();deleteSession('${s.id}')" title="Delete">✕</button>
+          </div>
+        </div>`).join('')}
+    </div>`;
+}
+
+function selectSession(id) {
+  CUR = SESSIONS.find(s => s.id === id);
+  setView('overview');
+}
+
+// ══════════════════════════════════════════════════════════════
+//  TRENDS VIEW
+// ══════════════════════════════════════════════════════════════
+function vTrends() {
+  if (SESSIONS.length < 2) return `<div class="empty"><span class="empty-ico">📈</span><div class="empty-txt">Need at least 2 sessions</div></div>`;
+  const sorted = [...SESSIONS].sort((a,b)=>a.id.localeCompare(b.id));
+  return `
+    <div class="grid2">
+      <div class="card"><div class="card-title">Net ROI per Session</div><div class="chart-wrap"><canvas id="roi-chart"></canvas></div></div>
+      <div class="card"><div class="card-title">Score Trend</div><div class="chart-wrap"><canvas id="score-chart"></canvas></div></div>
+    </div>
+    <div class="card"><div class="card-title">VIX vs Net ROI</div><div class="chart-wrap"><canvas id="vix-chart"></canvas></div></div>
+    <div class="card"><div class="card-title">CE vs PE Comparison</div><div class="chart-wrap"><canvas id="cepe2-chart"></canvas></div></div>
+    <div class="card"><div class="card-title">Summary Statistics</div><div class="grid4">${trendStats(sorted)}</div></div>`;
+}
+
+function trendStats(ss) {
+  const nets = ss.map(s=>s.net_roi||0);
+  const wins = nets.filter(r=>r>0);
+  const totalNet = ss.reduce((a,s)=>a+(s.net_pnl||0),0);
+  const avgScore = Math.round(ss.reduce((a,s)=>a+s.scores.overall,0)/ss.length);
+  return [
+    ['Total Sessions',ss.length,''],
+    ['Win Rate',`${Math.round(wins.length/nets.length*100)}%`,wins.length+' winning'],
+    ['Total Net P&L',fmtInr(totalNet),totalNet>=0?'pos':'neg'],
+    ['Avg Score',`${avgScore}/100`,avgScore>=65?'pos':avgScore>=45?'neu':'neg'],
+  ].map(([l,v,cls])=>`<div class="mc"><div class="mc-lbl">${l}</div><div class="mc-val ${cls}">${v}</div></div>`).join('');
+}
+
+// ══════════════════════════════════════════════════════════════
+//  RULES VIEW
+// ══════════════════════════════════════════════════════════════
+function vRules() {
+  const rules = [
+    [1,"Short CE delta ≤ 0.20 at entry (~2%+ OTM)",true],
+    [2,"Margin utilisation ≤ 80% of deployed capital",true],
+    [3,"No re-entry into CE that went ITM on DTE=1",true],
+    [4,"No new secondary-index positions within 2 hrs of margin rejection",true],
+    [5,"No averaging into losing shorts",true],
+    [6,"Far-OTM wings mandatory when premium collected > 1% of capital",false],
+  ];
+  return `
+    <div class="card">
+      <div class="card-title">Default Trading Rules <span class="card-badge">DTE=1, VIX &gt; 20</span></div>
+      <table class="tbl">
+        <thead><tr><th>#</th><th>Rule</th><th>Status</th></tr></thead>
+        <tbody>
+          ${rules.map(([n,r,a])=>`<tr><td class="fm" style="color:var(--tx3)">${n}</td><td>${r}</td><td><span class="badge ${a?'b-gr':'b-am'}">${a?'ACTIVE':'OPTIONAL'}</span></td></tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  ADD / EDIT MODAL
+// ══════════════════════════════════════════════════════════════
+function openAddModal() {
+  if (USER_ROLE !== 'admin') { toast('Admin only','err'); return; }
+  document.getElementById('modal-title').innerHTML = 'Add Session <button class="modal-close" onclick="closeModal()">✕</button>';
+  document.getElementById('modal-body').innerHTML = modalForm(null);
+  document.getElementById('modal-bg').style.display = 'flex';
+}
+function openEditModal(id) {
+  if (USER_ROLE !== 'admin') { toast('Admin only','err'); return; }
+  const s = SESSIONS.find(x=>x.id===id);
+  document.getElementById('modal-title').innerHTML = `Edit — ${s?s.full:'Session'} <button class="modal-close" onclick="closeModal()">✕</button>`;
+  document.getElementById('modal-body').innerHTML = modalForm(s);
+  document.getElementById('modal-bg').style.display = 'flex';
+}
+function closeModal() { document.getElementById('modal-bg').style.display='none'; }
+
+function modalForm(s) {
+  return `
+    <div class="tab-row" id="modal-tabs">
+      <div class="tab active" onclick="switchModalTab('json',this)">Paste JSON</div>
+      <div class="tab" onclick="switchModalTab('form',this)">Manual Form</div>
+    </div>
+    <div id="modal-json-tab">
+      <div class="form-row" style="margin-bottom:10px">
+        <label>Paste Session Ledger JSON from evaluator skill</label>
+        <textarea id="json-input" rows="16" placeholder='Paste JSON here...'>${s?JSON.stringify(s,null,2):''}</textarea>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-gr" onclick="saveFromJSON()">💾 Save</button>
+        <button class="btn btn-sm" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-sm" onclick="validateJSON()">✓ Validate</button>
+        ${s?`<button class="btn btn-sm btn-rd" style="margin-left:auto" onclick="deleteSession('${s.id}');closeModal()">🗑 Delete</button>`:''}
+      </div>
+    </div>
+    <div id="modal-form-tab" style="display:none">
+      ${manualFormFields(s)}
+      <div class="btn-row" style="margin-top:14px">
+        <button class="btn btn-gr" onclick="saveFromForm()">💾 Save</button>
+        <button class="btn btn-sm" onclick="closeModal()">Cancel</button>
+      </div>
+    </div>`;
+}
+
+function switchModalTab(tab, el) {
+  document.querySelectorAll('#modal-tabs .tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('modal-json-tab').style.display = tab==='json' ? '' : 'none';
+  document.getElementById('modal-form-tab').style.display = tab==='form' ? '' : 'none';
+}
+
+function manualFormFields(s) {
+  const v=s||{}, sc=v.scores||{};
+  return `
+    <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr;margin-bottom:10px">
+      <div class="form-row"><label>Date (YYYY-MM-DD)</label><input type="text" id="mf-id" value="${v.id||getTodayId()}"></div>
+      <div class="form-row"><label>Index</label>
+        <select id="mf-index">${['Nifty','BankNifty','Sensex','FinNifty','Nifty+Sensex','Nifty+BankNifty'].map(i=>`<option${(v.index||'Nifty')===i?' selected':''}>${i}</option>`).join('')}</select></div>
+      <div class="form-row"><label>DTE</label><input type="number" id="mf-dte" value="${v.dte||0}" min="0" max="10"></div>
+      <div class="form-row"><label>India VIX</label><input type="number" id="mf-vix" value="${v.vix||0}" step="0.1"></div>
+      <div class="form-row"><label>Capital ₹</label><input type="number" id="mf-capital" value="${v.capital||20000000}"></div>
+      <div class="form-row"><label>MT Score</label><input type="number" id="mf-mt" value="${v.mt||0}" step="0.01"></div>
+      <div class="form-row"><label>Gross P&L ₹</label><input type="number" id="mf-gross" value="${v.gross_pnl||0}"></div>
+      <div class="form-row"><label>Net P&L ₹</label><input type="number" id="mf-net" value="${v.net_pnl||0}"></div>
+      <div class="form-row"><label>Charges ₹</label><input type="number" id="mf-charges" value="${v.charges||0}"></div>
+      <div class="form-row"><label>CE P&L ₹</label><input type="number" id="mf-ce" value="${v.ce_pnl||0}"></div>
+      <div class="form-row"><label>PE P&L ₹</label><input type="number" id="mf-pe" value="${v.pe_pnl||0}"></div>
+      <div class="form-row"><label>Executed orders</label><input type="number" id="mf-exec" value="${v.executed||0}"></div>
+      <div class="form-row"><label>Rejected orders</label><input type="number" id="mf-rej" value="${v.rejected||0}"></div>
+      <div class="form-row"><label>Carry out</label><input type="number" id="mf-carry" value="${v.carry_out||0}"></div>
+      <div class="form-row"><label>Peer ROIs (comma %)</label><input type="text" id="mf-peers" value="${(v.peer_rois||[]).join(',')}"></div>
+    </div>
+    <div style="font-size:11px;color:var(--tx2);margin-bottom:6px;font-weight:600">SCORES (0–100)</div>
+    <div class="form-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:10px">
+      ${[['Overall','mf-sov',sc.overall||0],['Discipline','mf-sd',sc.discipline||0],['Cap Eff','mf-sce',sc.cap_eff||0],['Trade Q','mf-stq',sc.trade_q||0],['Mkt Align','mf-sma',sc.mkt_align||0],['Vol Handle','mf-svh',sc.vol_handle||0],['Peer Cmp','mf-spc',sc.peer_cmp||0]].map(([l,id,val])=>`<div class="form-row"><label>${l}</label><input type="number" id="${id}" value="${val}" min="0" max="100"></div>`).join('')}
+    </div>
+    <div class="form-grid" style="grid-template-columns:1fr 1fr;margin-bottom:10px">
+      <div class="form-row"><label>Violations (one per line)</label><textarea id="mf-violations" rows="4">${(v.violations||[]).join('\n')}</textarea></div>
+      <div class="form-row"><label>Strengths (one per line)</label><textarea id="mf-strengths" rows="4">${(v.strengths||[]).join('\n')}</textarea></div>
+    </div>`;
+}
+
+async function saveFromJSON() {
+  const raw = document.getElementById('json-input').value.trim();
+  if (!raw) { toast('Nothing to save','err'); return; }
+  try {
+    const sess = JSON.parse(raw);
+    if (!sess.id) throw new Error('Missing id field');
+    if (!sess.net_roi) sess.net_roi = +(sess.net_pnl/sess.capital*100).toFixed(6);
+    if (!sess.gross_roi) sess.gross_roi = +(sess.gross_pnl/sess.capital*100).toFixed(6);
+    if (!sess.date||!sess.full) {
+      const d=new Date(sess.id);
+      const mo=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      sess.date=`${mo[d.getMonth()]} ${d.getDate()}`;
+      sess.full=`${String(d.getDate()).padStart(2,'0')}-${mo[d.getMonth()]}-${d.getFullYear()}`;
+    }
+    await saveSession(sess);
+    await loadSessions();
+    CUR = SESSIONS.find(s=>s.id===sess.id) || SESSIONS[0];
+    closeModal();
+    setView('overview');
+    toast(`Session ${sess.full} saved`,'ok');
+  } catch(e) { toast('Error: '+e.message,'err'); }
+}
+
+function validateJSON() {
+  try { JSON.parse(document.getElementById('json-input').value.trim()); toast('JSON is valid ✓','ok'); }
+  catch(e) { toast('Invalid JSON: '+e.message,'err'); }
+}
+
+async function saveFromForm() {
+  const id = document.getElementById('mf-id').value.trim();
+  if (!id) { toast('Date is required','err'); return; }
+  const d = new Date(id);
+  const mo = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const grossPnl = parseInt(document.getElementById('mf-gross').value)||0;
+  const netPnl   = parseInt(document.getElementById('mf-net').value)||0;
+  const capital  = parseInt(document.getElementById('mf-capital').value)||20000000;
+  const peers = (document.getElementById('mf-peers').value||'').split(',').map(x=>parseFloat(x.trim())).filter(x=>!isNaN(x));
+  const sess = {
+    id, date:`${mo[d.getMonth()]} ${d.getDate()}`,
+    full:`${String(d.getDate()).padStart(2,'0')}-${mo[d.getMonth()]}-${d.getFullYear()}`,
+    index:document.getElementById('mf-index').value,
+    dte:parseInt(document.getElementById('mf-dte').value)||0,
+    vix:parseFloat(document.getElementById('mf-vix').value)||0,
+    capital, gross_pnl:grossPnl, net_pnl:netPnl,
+    gross_roi:+(grossPnl/capital*100).toFixed(6), net_roi:+(netPnl/capital*100).toFixed(6),
+    ce_pnl:parseInt(document.getElementById('mf-ce').value)||0,
+    pe_pnl:parseInt(document.getElementById('mf-pe').value)||0,
+    charges:parseInt(document.getElementById('mf-charges').value)||0,
+    executed:parseInt(document.getElementById('mf-exec').value)||0,
+    rejected:parseInt(document.getElementById('mf-rej').value)||0,
+    mt:parseFloat(document.getElementById('mf-mt').value)||0,
+    peer_rois:peers,
+    scores:{overall:parseInt(document.getElementById('mf-sov').value)||0,discipline:parseInt(document.getElementById('mf-sd').value)||0,cap_eff:parseInt(document.getElementById('mf-sce').value)||0,trade_q:parseInt(document.getElementById('mf-stq').value)||0,mkt_align:parseInt(document.getElementById('mf-sma').value)||0,vol_handle:parseInt(document.getElementById('mf-svh').value)||0,peer_cmp:parseInt(document.getElementById('mf-spc').value)||0},
+    violations:(document.getElementById('mf-violations').value||'').split('\n').map(x=>x.trim()).filter(Boolean),
+    strengths:(document.getElementById('mf-strengths').value||'').split('\n').map(x=>x.trim()).filter(Boolean),
+    carry_out:parseInt(document.getElementById('mf-carry').value)||0,
+    positions:[],time_pnl:{}
+  };
+  try {
+    await saveSession(sess);
+    await loadSessions();
+    CUR = SESSIONS.find(s=>s.id===id) || SESSIONS[0];
+    closeModal();
+    setView('overview');
+    toast(`Session ${sess.full} saved`,'ok');
+  } catch(e) { toast(e.message,'err'); }
+}
+
+// ══════════════════════════════════════════════════════════════
 //  AI COMMENTARY
-// ══════════════════════════════════════════════════
-async function generateAI() {
-  if (userRole !== 'admin') { notify('Admin only','err'); return; }
-  const id = document.getElementById('detail-sel').value;
-  const btn = document.getElementById('ai-btn');
-  btn.innerHTML = '<span class="spinner light"></span> Generating…';
-  btn.disabled = true;
+// ══════════════════════════════════════════════════════════════
+async function generateAI(id) {
+  if (USER_ROLE !== 'admin') { toast('Admin only','err'); return; }
+  toast('Generating AI commentary…','');
   try {
     await apiFetch(`/ai-commentary/${id}`, { method:'POST' });
     await loadSessions();
-    renderDetail();
-    notify('AI commentary generated','ok');
-  } catch(e) {
-    notify(e.message,'err');
-  } finally {
-    btn.innerHTML = '✦ AI Commentary';
-    btn.disabled = false;
+    CUR = SESSIONS.find(s=>s.id===id) || CUR;
+    renderView();
+    toast('AI commentary generated','ok');
+  } catch(e) { toast(e.message,'err'); }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  CHARTS
+// ══════════════════════════════════════════════════════════════
+function buildOverviewCharts() {
+  const s = CUR; if (!s) return;
+  const eq = document.getElementById('eq-chart');
+  if (eq) {
+    const hasTP = s.time_pnl && Object.keys(s.time_pnl).length;
+    const labels = hasTP ? Object.keys(s.time_pnl) : ['Open','T1','T2','T3','T4','T5'];
+    const data   = hasTP ? Object.values(s.time_pnl) : [0,(s.net_pnl||0)*.2,(s.net_pnl||0)*.45,(s.net_pnl||0)*.7,(s.net_pnl||0)*.9,(s.net_pnl||0)];
+    const cum = [0]; for (const v of data) cum.push(cum[cum.length-1]+v);
+    const pos = cum[cum.length-1] >= 0;
+    CHARTS.eq = new Chart(eq, {type:'line',data:{labels:['Open',...labels],datasets:[{data:cum,borderColor:pos?'#3fb950':'#f85149',backgroundColor:pos?'rgba(63,185,80,.06)':'rgba(248,81,73,.06)',fill:true,tension:.4,pointRadius:0,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:'#2a3441'},ticks:{color:'#8b949e',font:{size:9}}},y:{grid:{color:'#2a3441'},ticks:{color:'#8b949e',font:{size:9}}}}}});
+  }
+  const cp = document.getElementById('cepe-chart');
+  if (cp) {
+    CHARTS.cepe = new Chart(cp, {type:'bar',data:{labels:['CE P&L','PE P&L','Net P&L'],datasets:[{data:[s.ce_pnl||0,s.pe_pnl||0,s.net_pnl||0],backgroundColor:[(s.ce_pnl||0)>=0?'rgba(63,185,80,.7)':'rgba(248,81,73,.7)',(s.pe_pnl||0)>=0?'rgba(63,185,80,.7)':'rgba(248,81,73,.7)',(s.net_pnl||0)>=0?'rgba(88,166,255,.7)':'rgba(248,81,73,.7)'],borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:'#2a3441'},ticks:{color:'#8b949e',font:{size:10}}},y:{grid:{color:'#2a3441'},ticks:{color:'#8b949e',font:{size:9}}}}}});
   }
 }
 
-// ══════════════════════════════════════════════════
-//  SCORING
-// ══════════════════════════════════════════════════
-function renderScoring() {
-  const id = document.getElementById('scoring-sel').value;
-  const s = sessions.find(x=>x.id===id);
-  if (!s) return;
-  const sc = s.scores || {};
-  const dims = [
-    {key:'discipline', label:'Discipline',          w:25},
-    {key:'cap_eff',    label:'Capital Efficiency',  w:20},
-    {key:'trade_q',    label:'Trade Quality',       w:20},
-    {key:'mkt_align',  label:'Market Alignment',    w:15},
-    {key:'vol_handle', label:'Volatility Handling', w:10},
-    {key:'peer_cmp',   label:'Peer Comparison',     w:10},
-  ];
-  document.getElementById('scoring-content').innerHTML = `
-    <div class="g3" style="margin-bottom:20px">
-      <div class="stat-card">
-        <div class="sc-label">Overall Score</div>
-        <div class="sc-value" style="color:${scoreClr(sc.overall||0)}">${sc.overall||'—'}/100</div>
-        <div class="sc-sub">${scoreLabel(sc.overall||0)}</div>
-      </div>
-      <div class="stat-card">
-        <div class="sc-label">Market Toughness</div>
-        <div class="sc-value accent">${s.mt!=null?s.mt.toFixed(2):'—'}/10</div>
-      </div>
-      <div class="stat-card">
-        <div class="sc-label">Session</div>
-        <div class="sc-value" style="font-size:16px">${s.date}</div>
-        <div class="sc-sub">${s.index||s.index_name} Expiry</div>
-      </div>
+function buildScoringCharts() {
+  const s = CUR; if (!s) return;
+  const rn = document.getElementById('ring-chart');
+  if (rn) {
+    const ov = s.scores.overall;
+    CHARTS.ring = new Chart(rn, {type:'doughnut',data:{datasets:[{data:[ov,100-ov],backgroundColor:[ov>=65?'#3fb950':ov>=45?'#d29922':'#f85149','#1e2530'],borderWidth:0,circumference:270,rotation:225}]},options:{responsive:false,plugins:{legend:{display:false},tooltip:{enabled:false}},cutout:'72%'}});
+  }
+}
+
+function buildTrendCharts() {
+  const sorted = [...SESSIONS].sort((a,b)=>a.id.localeCompare(b.id));
+  const labels = sorted.map(s=>s.date||s.full);
+  const rc = document.getElementById('roi-chart');
+  if (rc) CHARTS.roi = new Chart(rc, {type:'bar',data:{labels,datasets:[{data:sorted.map(s=>+((s.net_roi||0).toFixed(4))),backgroundColor:sorted.map(s=>(s.net_roi||0)>=0?'rgba(63,185,80,.7)':'rgba(248,81,73,.7)'),borderRadius:3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:'#2a3441'},ticks:{color:'#8b949e',font:{size:10}}},y:{grid:{color:'#2a3441'},ticks:{color:'#8b949e',font:{size:9},callback:v=>v+'%'}}}}});
+  const sc2 = document.getElementById('score-chart');
+  if (sc2) CHARTS.score = new Chart(sc2, {type:'line',data:{labels,datasets:[{label:'Overall',data:sorted.map(s=>s.scores.overall),borderColor:'#58a6ff',tension:.4,pointRadius:3,borderWidth:2},{label:'Discipline',data:sorted.map(s=>s.scores.discipline),borderColor:'#3fb950',tension:.4,pointRadius:3,borderWidth:1.5,borderDash:[4,4]}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:'#2a3441'},ticks:{color:'#8b949e',font:{size:10}}},y:{grid:{color:'#2a3441'},min:0,max:100,ticks:{color:'#8b949e',font:{size:9}}}}}});
+  const vc = document.getElementById('vix-chart');
+  if (vc) CHARTS.vix = new Chart(vc, {type:'scatter',data:{datasets:[{data:sorted.map(s=>({x:s.vix||0,y:+((s.net_roi||0).toFixed(4))})),backgroundColor:sorted.map(s=>(s.net_roi||0)>=0?'rgba(63,185,80,.7)':'rgba(248,81,73,.7)'),pointRadius:6}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:'#2a3441'},title:{display:true,text:'India VIX',color:'#8b949e',font:{size:10}},ticks:{color:'#8b949e',font:{size:9}}},y:{grid:{color:'#2a3441'},title:{display:true,text:'Net ROI %',color:'#8b949e',font:{size:10}},ticks:{color:'#8b949e',font:{size:9},callback:v=>v+'%'}}}}});
+  const cp2 = document.getElementById('cepe2-chart');
+  if (cp2) CHARTS.cepe2 = new Chart(cp2, {type:'bar',data:{labels,datasets:[{label:'CE P&L',data:sorted.map(s=>s.ce_pnl||0),backgroundColor:'rgba(248,81,73,.65)',borderRadius:3},{label:'PE P&L',data:sorted.map(s=>s.pe_pnl||0),backgroundColor:'rgba(63,185,80,.65)',borderRadius:3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:'#2a3441'},ticks:{color:'#8b949e',font:{size:10}}},y:{grid:{color:'#2a3441'},ticks:{color:'#8b949e',font:{size:9},callback:v=>v>=0?'₹'+(v/100000).toFixed(1)+'L':'−₹'+(Math.abs(v)/100000).toFixed(1)+'L'}}}}});
+}
+
+// ══════════════════════════════════════════════════════════════
+//  EXPORT
+// ══════════════════════════════════════════════════════════════
+function exportAllJSON() {
+  const j = JSON.stringify(SESSIONS, null, 2);
+  const a = document.createElement('a');
+  a.href = 'data:application/json;charset=utf-8,' + encodeURIComponent(j);
+  a.download = 'VJ_Sessions_Backup.json'; a.click();
+}
+
+// ══════════════════════════════════════════════════════════════
+//  UTILITIES
+// ══════════════════════════════════════════════════════════════
+function noSession() {
+  return `<div class="empty">
+    <span class="empty-ico">📂</span>
+    <div class="empty-txt">No session selected</div>
+    <div class="empty-sub">Upload a CSV or select a session from Session History</div>
+    <div style="margin-top:14px;display:flex;gap:10px;justify-content:center">
+      <button class="btn btn-pr" onclick="setView('upload')">📂 Upload CSV</button>
+      <button class="btn btn-sm" onclick="setView('sessions')">View Sessions</button>
     </div>
-    <div class="chart-card">
-      <div class="chart-title">Six-Dimension Breakdown</div>
-      <div class="score-rows" style="padding:4px 0">
-        ${dims.map(d=>{
-          const raw=sc[d.key]||0; const col=scoreClr(raw);
-          return `<div class="score-row">
-            <div class="score-lbl">${d.label} <span class="muted">(${d.w}%)</span></div>
-            <div class="score-bar-bg"><div class="score-bar-fill" style="width:${raw}%;background:linear-gradient(90deg,${col},${col}55)"></div></div>
-            <div class="score-num" style="color:${col}">${raw}</div>
-          </div>`;
-        }).join('')}
-      </div>
-    </div>
-    <div class="g2">
-      <div>
-        <div class="sec-title">Violations</div>
-        ${(s.violations||[]).map(v=>`<div class="list-item viol">${v}</div>`).join('')||'<div class="muted" style="font-size:13px">None</div>'}
-      </div>
-      <div>
-        <div class="sec-title">Strengths</div>
-        ${(s.strengths||[]).map(v=>`<div class="list-item str">${v}</div>`).join('')||'<div class="muted" style="font-size:13px">None</div>'}
-      </div>
-    </div>
-  `;
+  </div>`;
 }
-
-// ══════════════════════════════════════════════════
-//  UPLOAD CSV
-// ══════════════════════════════════════════════════
-function renderUploadTab() {
-  const sel = document.getElementById('up-sess');
-  if (sel) sel.innerHTML = sessions.map(s =>
-    `<option value="${s.id}">${s.full||s.date} — ${s.index||s.index_name}</option>`
-  ).join('');
+function fmtInr(v) {
+  const sign = v<0?'−':v>0?'+':'';
+  const a = Math.abs(v);
+  return `${sign}₹${a>=10000000?(a/10000000).toFixed(2)+'Cr':a>=100000?(a/100000).toFixed(2)+'L':a.toLocaleString('en-IN')}`;
 }
-
-function handleFileSelect(input) {
-  csvFile = input.files[0];
-  if (csvFile) {
-    document.getElementById('up-fname').textContent = csvFile.name;
-    document.getElementById('up-btn').disabled = false;
-  }
+function fmtCr(v) { return v>=10000000?(v/10000000).toFixed(2)+'Cr':v>=100000?(v/100000).toFixed(0)+'L':(v||0).toLocaleString('en-IN'); }
+function scCol(s) { return s>=65?'var(--gr)':s>=45?'var(--am)':'var(--rd)'; }
+function scLbl(s) { return s>=80?'Exceptional':s>=65?'Good':s>=50?'Average':s>=35?'Below Avg':'Poor'; }
+function getTodayId() { return new Date().toISOString().slice(0,10); }
+function toast(msg, type='') {
+  const el = document.createElement('div');
+  el.className = `toast ${type}`; el.textContent = msg;
+  document.getElementById('toast-wrap').appendChild(el);
+  setTimeout(() => el.remove(), 3500);
 }
-
-function handleDrop(e) {
-  e.preventDefault();
-  document.getElementById('up-zone').classList.remove('drag');
-  const file = e.dataTransfer.files[0];
-  if (file) {
-    csvFile = file;
-    document.getElementById('up-fname').textContent = file.name;
-    document.getElementById('up-btn').disabled = false;
-  }
-}
-
-async function uploadCSV() {
-  if (!csvFile) return;
-  const sessId = document.getElementById('up-sess').value;
-  if (!sessId) { notify('Select a session first','err'); return; }
-
-  const capital = parseFloat(document.getElementById('up-capital').value);
-  if (capital > 0) {
-    const s = sessions.find(x=>x.id===sessId);
-    if (s) {
-      await apiFetch('/sessions', { method:'POST', body:JSON.stringify({
-        ...s, index_name:s.index||s.index_name, capital,
-        scores:{overall:s.scores?.overall||0,...s.scores}
-      })}).catch(()=>{});
-    }
-  }
-
-  const btn = document.getElementById('up-btn');
-  btn.innerHTML = '<span class="spinner"></span> Parsing…';
-  btn.disabled = true;
-
-  const fd = new FormData();
-  fd.append('file', csvFile);
-
-  try {
-    const token = getToken();
-    const res = await fetch(`${API}/upload-csv/${sessId}`, {
-      method:'POST', headers:{'Authorization':`Bearer ${token}`}, body:fd });
-    if (!res.ok) { const e=await res.json(); throw new Error(e.detail); }
-    const data = await res.json();
-    await loadSessions();
-    populateSelects();
-
-    const ch = data.charges_breakdown;
-    document.getElementById('up-result').innerHTML = `
-      <div class="info-box success">
-        <b>✅ ${data.message}</b><br>
-        Gross P&L: ${fmtCr(data.gross_pnl)} &nbsp;|&nbsp;
-        Net P&L: ${fmtCr(data.net_pnl)} &nbsp;|&nbsp;
-        Charges: ${fmtCr(data.total_charges)}<br>
-        <span class="muted">STT: ₹${ch.stt} &nbsp; Exchange: ₹${ch.exchange} &nbsp; SEBI: ₹${ch.sebi.toFixed(2)} &nbsp; Stamp: ₹${ch.stamp} &nbsp; GST: ₹${ch.gst}</span>
-        ${data.carry_positions?.length?`<br><b class="yellow">⚠ ${data.carry_positions.length} carry position(s)</b>`:''}
-        ${data.warnings?.length?`<br><span class="red">Warnings: ${data.warnings.join(' | ')}</span>`:''}
-      </div>
-      <div class="tbl-wrap" style="max-height:320px;overflow-y:auto">
-        <table>
-          <thead><tr><th>Symbol</th><th>Type</th><th>Realized P&L</th><th>Buy VWAP</th><th>Sell VWAP</th><th>Qty</th></tr></thead>
-          <tbody>
-            ${(data.strikes||[]).map(st=>`<tr>
-              <td style="font-size:11px">${st.symbol}</td>
-              <td><span class="badge ${st.option_type==='CE'?'badge-blue':'badge-yellow'}">${st.option_type||'—'}</span></td>
-              <td>${fmtPnl(st.realized)}</td>
-              <td>${st.buy_vwap||'—'}</td>
-              <td>${st.sell_vwap||'—'}</td>
-              <td>${st.matched_qty||0}</td>
-            </tr>`).join('')}
-          </tbody>
-        </table>
-      </div>`;
-    notify('CSV parsed successfully','ok');
-  } catch(e) {
-    document.getElementById('up-result').innerHTML = `<div class="info-box err"><b>❌ Parse failed:</b> ${e.message}</div>`;
-    notify(e.message,'err');
-  } finally {
-    btn.innerHTML = '↑ Parse &amp; Upload';
-    btn.disabled = false;
-  }
-}
-
-// ══════════════════════════════════════════════════
-//  CHARTS & JOURNAL PAGE
-// ══════════════════════════════════════════════════
-function renderChartsPage() {
-  const id = document.getElementById('cj-sess').value;
-  const s = sessions.find(x=>x.id===id);
-  if (!s) return;
-
-  // Chart section
-  if (s.chart_image) {
-    document.getElementById('cj-chart-area').innerHTML = `
-      <div class="chart-img-wrap" style="margin-bottom:14px">
-        <img src="${s.chart_image}" alt="Day chart">
-      </div>`;
-    document.getElementById('cj-del-btn').style.display = '';
-  } else {
-    document.getElementById('cj-chart-area').innerHTML = '';
-    document.getElementById('cj-del-btn').style.display = 'none';
-  }
-  document.getElementById('cj-upload-btn').disabled = !chartFile;
-
-  // Journal
-  document.getElementById('cj-journal-edit').value = s.journal || '';
-  document.getElementById('cj-journal-area').innerHTML = s.journal
-    ? `<div class="journal-view" style="margin-bottom:12px">${escHtml(s.journal)}</div>`
-    : '';
-}
-
-function handleChartSelect(input) {
-  chartFile = input.files[0];
-  if (chartFile) {
-    document.getElementById('cj-fname').textContent = chartFile.name;
-    document.getElementById('cj-upload-btn').disabled = false;
-  }
-}
-
-function handleChartDrop(e) {
-  e.preventDefault();
-  document.getElementById('cj-drop').classList.remove('drag');
-  const file = e.dataTransfer.files[0];
-  if (file && file.type.startsWith('image/')) {
-    chartFile = file;
-    document.getElementById('cj-fname').textContent = file.name;
-    document.getElementById('cj-upload-btn').disabled = false;
-  } else {
-    notify('Please drop an image file','err');
-  }
-}
-
-async function uploadChart() {
-  if (!chartFile) return;
-  const id = document.getElementById('cj-sess').value;
-  const btn = document.getElementById('cj-upload-btn');
-  btn.innerHTML = '<span class="spinner"></span>';
-  btn.disabled = true;
-  try {
-    const fd = new FormData();
-    fd.append('file', chartFile);
-    const token = getToken();
-    const res = await fetch(`${API}/upload-chart/${id}`, {
-      method:'POST', headers:{'Authorization':`Bearer ${token}`}, body:fd });
-    if (!res.ok) { const e=await res.json(); throw new Error(e.detail); }
-    chartFile = null;
-    document.getElementById('cj-fname').textContent = '';
-    await loadSessions();
-    renderChartsPage();
-    notify('Chart uploaded','ok');
-  } catch(e) {
-    notify(e.message,'err');
-  } finally {
-    btn.innerHTML = 'Upload Chart';
-    btn.disabled = !chartFile;
-  }
-}
-
-async function deleteChart() {
-  const id = document.getElementById('cj-sess').value;
-  if (!confirm('Delete chart image for this session?')) return;
-  try {
-    await apiFetch(`/upload-chart/${id}`, { method:'DELETE' });
-    await loadSessions();
-    renderChartsPage();
-    notify('Chart deleted','ok');
-  } catch(e) {
-    notify(e.message,'err');
-  }
-}
-
-async function saveJournal() {
-  const id = document.getElementById('cj-sess').value;
-  const s = sessions.find(x=>x.id===id);
-  if (!s) return;
-  const journal = document.getElementById('cj-journal-edit').value;
-  try {
-    await apiFetch('/sessions', { method:'POST', body:JSON.stringify({
-      ...s, index_name:s.index||s.index_name, journal,
-      scores:{overall:s.scores?.overall||0,...s.scores}
-    })});
-    await loadSessions();
-    renderChartsPage();
-    notify('Journal saved','ok');
-  } catch(e) {
-    notify(e.message,'err');
-  }
-}
-
-// ══════════════════════════════════════════════════
-//  ADD / EDIT SESSION MODAL
-// ══════════════════════════════════════════════════
-function openAddModal() {
-  if (userRole !== 'admin') { notify('Admin only','err'); return; }
-  editingId = null;
-  document.getElementById('modal-title').textContent = '+ New Session';
-  document.getElementById('del-btn').style.display = 'none';
-  document.getElementById('modal-err').textContent = '';
-  // Clear form
-  ['f-date','f-vix','f-capital','f-gross','f-charges','f-ce','f-pe',
-   'f-executed','f-rejected','f-mt','f-score','f-disc','f-capeff',
-   'f-trq','f-mka','f-volh','f-peer','f-note'].forEach(id => {
-    document.getElementById(id).value = '';
-  });
-  document.getElementById('f-carry').value = '0';
-  document.getElementById('f-violations').value = '';
-  document.getElementById('f-strengths').value = '';
-  document.getElementById('f-index').value = 'Nifty';
-  document.getElementById('sess-modal').classList.add('open');
-}
-
-function openEditModal(id) {
-  if (userRole !== 'admin') { notify('Admin only','err'); return; }
-  const targetId = id || document.getElementById('detail-sel').value;
-  const s = sessions.find(x=>x.id===targetId);
-  if (!s) return;
-  editingId = targetId;
-  document.getElementById('modal-title').textContent = `Edit — ${s.full||s.date}`;
-  document.getElementById('del-btn').style.display = '';
-  document.getElementById('modal-err').textContent = '';
-  document.getElementById('f-date').value = s.id;
-  document.getElementById('f-index').value = s.index||s.index_name||'Nifty';
-  document.getElementById('f-vix').value = s.vix||'';
-  document.getElementById('f-capital').value = s.capital||'';
-  document.getElementById('f-gross').value = s.gross_pnl||'';
-  document.getElementById('f-charges').value = s.charges||'';
-  document.getElementById('f-ce').value = s.ce_pnl||'';
-  document.getElementById('f-pe').value = s.pe_pnl||'';
-  document.getElementById('f-executed').value = s.executed||'';
-  document.getElementById('f-rejected').value = s.rejected||'';
-  document.getElementById('f-mt').value = s.mt||'';
-  document.getElementById('f-score').value = s.scores?.overall||'';
-  document.getElementById('f-disc').value = s.scores?.discipline||'';
-  document.getElementById('f-capeff').value = s.scores?.cap_eff||'';
-  document.getElementById('f-trq').value = s.scores?.trade_q||'';
-  document.getElementById('f-mka').value = s.scores?.mkt_align||'';
-  document.getElementById('f-volh').value = s.scores?.vol_handle||'';
-  document.getElementById('f-peer').value = s.scores?.peer_cmp||'';
-  document.getElementById('f-carry').value = s.carry_out||0;
-  document.getElementById('f-note').value = s.note||'';
-  document.getElementById('f-violations').value = (s.violations||[]).join('\n');
-  document.getElementById('f-strengths').value = (s.strengths||[]).join('\n');
-  document.getElementById('sess-modal').classList.add('open');
-}
-
-function closeSessModal() {
-  document.getElementById('sess-modal').classList.remove('open');
-  editingId = null;
-}
-
-async function saveSession() {
-  const date = editingId || document.getElementById('f-date').value;
-  if (!date) { document.getElementById('modal-err').textContent='Date is required'; return; }
-  const d = new Date(date);
-  const mos = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  const gross   = parseFloat(document.getElementById('f-gross').value)   || null;
-  const charges = parseFloat(document.getElementById('f-charges').value) || null;
-  const capital = parseFloat(document.getElementById('f-capital').value) || null;
-  const net = (gross!=null && charges!=null) ? gross - charges : null;
-
-  const body = {
-    id:         date,
-    date:       `${d.getDate().toString().padStart(2,'0')} ${mos[d.getMonth()]}`,
-    full:       `${d.getDate().toString().padStart(2,'0')}-${mos[d.getMonth()]}-${d.getFullYear()}`,
-    index_name: document.getElementById('f-index').value,
-    dte: 0, vix: parseFloat(document.getElementById('f-vix').value)||null,
-    capital, gross_pnl:gross, net_pnl:net,
-    net_roi:  (capital&&net)  ? +(net/capital*100).toFixed(4)   : null,
-    gross_roi:(capital&&gross)? +(gross/capital*100).toFixed(4) : null,
-    ce_pnl:  parseFloat(document.getElementById('f-ce').value)||null,
-    pe_pnl:  parseFloat(document.getElementById('f-pe').value)||null,
-    charges, executed: parseInt(document.getElementById('f-executed').value)||null,
-    rejected: parseInt(document.getElementById('f-rejected').value)||0,
-    mt:       parseFloat(document.getElementById('f-mt').value)||null,
-    carry_out:parseInt(document.getElementById('f-carry').value)||0,
-    note:     document.getElementById('f-note').value||null,
-    peer_rois:[], journal: null,
-    scores:{
-      overall:    parseInt(document.getElementById('f-score').value)||0,
-      discipline: parseInt(document.getElementById('f-disc').value)||0,
-      cap_eff:    parseInt(document.getElementById('f-capeff').value)||0,
-      trade_q:    parseInt(document.getElementById('f-trq').value)||0,
-      mkt_align:  parseInt(document.getElementById('f-mka').value)||0,
-      vol_handle: parseInt(document.getElementById('f-volh').value)||0,
-      peer_cmp:   parseInt(document.getElementById('f-peer').value)||0,
-    },
-    violations: document.getElementById('f-violations').value.split('\n').filter(x=>x.trim()),
-    strengths:  document.getElementById('f-strengths').value.split('\n').filter(x=>x.trim()),
-  };
-  // Preserve existing journal if editing
-  if (editingId) {
-    const existing = sessions.find(x=>x.id===editingId);
-    if (existing?.journal) body.journal = existing.journal;
-  }
-
-  const btn = document.querySelector('#sess-modal .btn-primary');
-  btn.innerHTML = '<span class="spinner"></span> Saving…';
-  btn.disabled = true;
-
-  try {
-    await apiFetch('/sessions', { method:'POST', body:JSON.stringify(body) });
-    await loadSessions();
-    renderOverview();
-    renderSessionsTable();
-    closeSessModal();
-    notify(editingId?'Session updated':'Session created','ok');
-  } catch(e) {
-    document.getElementById('modal-err').textContent = e.message;
-  } finally {
-    btn.innerHTML = '💾 Save Session';
-    btn.disabled = false;
-  }
-}
-
-async function deleteSession() {
-  if (!editingId) return;
-  const s = sessions.find(x=>x.id===editingId);
-  if (!confirm(`Delete session ${s?.full||editingId}? This cannot be undone.`)) return;
-  try {
-    await apiFetch(`/sessions/${editingId}`, { method:'DELETE' });
-    await loadSessions();
-    renderOverview();
-    closeSessModal();
-    notify('Session deleted','ok');
-  } catch(e) {
-    notify(e.message,'err');
-  }
-}
-
-// Close overlay on backdrop click
-document.getElementById('sess-modal').addEventListener('click', function(e) {
-  if (e.target === this) closeSessModal();
-});
-
-window.addEventListener('resize', () => {
-  if (document.getElementById('page-overview').classList.contains('active')) {
-    drawEquityChart(); drawScoreChart(); drawCePeChart();
-  }
-});
 </script>
 </body>
 </html>
